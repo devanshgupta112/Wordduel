@@ -10,7 +10,8 @@ const express = require('express');
 const compression = require('compression');
 const { Server } = require('socket.io');
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
+const HOST = '0.0.0.0';
 const ENABLE_CLUSTER = process.env.NODE_CLUSTER === 'true';
 const NUM_CORES = Math.min(os.cpus().length, 8);
 
@@ -34,8 +35,8 @@ if (ENABLE_CLUSTER && cluster.isPrimary) {
     cluster.fork();
   });
 
-  server.listen(PORT, () => {
-    console.log(`[WORDDUEL Cluster] Master load balancer active on port ${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`[WORDDUEL Cluster] Master load balancer active on http://${HOST}:${PORT}`);
   });
 
 } else {
@@ -132,6 +133,11 @@ function startWorker() {
       console.warn(`[Worker ${process.pid}] Redis setup skipped:`, err.message);
     }
   }
+
+  // Health check endpoint for Google Cloud Run container liveness probe
+  app.get('/healthz', (req, res) => {
+    res.status(200).send('ok');
+  });
 
   // Serve static assets with cache headers
   app.use(express.static(path.join(__dirname, 'public'), {
@@ -661,10 +667,37 @@ function startWorker() {
   });
 
   if (!ENABLE_CLUSTER) {
-    server.listen(PORT, () => {
-      console.log(`[WORDDUEL Standalone] Server active on http://localhost:${PORT}`);
+    server.listen(PORT, HOST, () => {
+      console.log(`[WORDDUEL Standalone] Server active on http://${HOST}:${PORT}`);
       console.log(`Loaded ${answersList.length} secret words and ${allowedSet.size} allowed dictionary guesses.`);
     });
   }
+
+  // Graceful shutdown handling for Cloud Run SIGTERM / SIGINT
+  let isShuttingDown = false;
+  function handleGracefulShutdown(signal) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`[WORDDUEL] Received ${signal}. Starting graceful shutdown...`);
+
+    // 1. Close Socket.io server to disconnect clients cleanly
+    io.close(() => {
+      console.log('[WORDDUEL] Socket.io server closed.');
+      // 2. Stop accepting new HTTP requests and finish active connections
+      server.close(() => {
+        console.log('[WORDDUEL] HTTP server closed cleanly. Process exiting.');
+        process.exit(0);
+      });
+    });
+
+    // 3. Fallback force exit after 10s to satisfy Cloud Run shutdown window
+    setTimeout(() => {
+      console.error('[WORDDUEL] Forcefully exiting after shutdown timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  }
+
+  process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
 }
 
