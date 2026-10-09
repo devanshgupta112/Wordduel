@@ -113,3 +113,4 @@ Here is how the architecture effortlessly scales:
 | **WebSocket Memory & CPU** | `perMessageDeflate: false` removes CPU context-switching overhead from millions of small JSON messages. |
 | **Bandwidth Egress** | `compression()` middleware compresses all static assets by 80%. |
 | **Memory Leaks** | Active rooms Map features a background TTL garbage collector that flushes finished rooms every 5 minutes. |
+# Wordduel
