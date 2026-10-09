@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="description" content="WORDDUEL - The Real-Time 2-Player Word Race">
+  <title>WORDDUEL — The Real-Time Word Race</title>
+  
+  <!-- Android PWA Support -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
+
+  <!-- Google Material Symbols Rounded for Game Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <!-- =================================================================== -->
+  <!-- GOOGLE ADSENSE / ADWORDS SCRIPT CONFIGURATION                       -->
+  <!-- 1. Replace 'ca-pub-XXXXXXXXXXXXXXXX' with your Google Publisher ID. -->
+  <!-- 2. Uncomment the script tag below to activate live ad loading.       -->
+  <!-- =================================================================== -->
+  <!--
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+       crossorigin="anonymous"></script>
+  -->
+
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Toast Feedback Alerts -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main Container -->
+  <div class="app-layout">
+    
+    <!-- Header Navigation -->
+    <header class="app-header">
+      <div class="header-left">
+        <a href="/" class="logo">
+          <span class="material-symbols-rounded logo-icon">sports_esports</span> WORD<span>DUEL</span>
+        </a>
+        <span class="room-pill" id="header-room-pill" style="display: none;">
+          ROOM <strong id="header-room-code">------</strong>
+        </span>
+      </div>
+
+      <div class="header-center" id="header-timer-pill" style="display: none;">
+        <span class="timer-badge"><span class="material-symbols-rounded timer-icon">timer</span> <span id="match-timer">00:00</span></span>
+      </div>
+
+      <div class="header-right">
+        <button id="how-to-play-btn" class="header-link-btn">How to play</button>
+        <button id="leave-room-header-btn" class="header-link-btn leave-btn" style="display: none;">Leave room</button>
+      </div>
+    </header>
+
+    <!-- Disconnect Countdown Alert -->
+    <div id="disconnect-banner" class="alert-banner disconnect-banner" style="display: none;">
+      <span class="material-symbols-rounded banner-icon">warning</span> Opponent disconnected! Waiting <span id="disconnect-countdown">30</span>s for reconnect...
+    </div>
+
+    <!-- MAIN VIEW CONTAINER -->
+    <main class="main-content">
+
+      <!-- ========================================== -->
+      <!-- VIEW 1: HOME SCREEN (Matches Mockup 1)     -->
+      <!-- ========================================== -->
+      <section id="view-home" class="view-panel active">
+        <div class="hero-container">
+          
+          <div class="tagline-pill"><span class="material-symbols-rounded tagline-icon">bolt</span> THE REAL-TIME WORD RACE</div>
+          
+          <!-- 3D Letter Tiles Brand Hero -->
+          <div class="brand-tiles-grid">
+            <div class="tile-row">
+              <span class="hero-tile">W</span>
+              <span class="hero-tile">O</span>
+              <span class="hero-tile">R</span>
+              <span class="hero-tile">D</span>
+            </div>
+            <div class="tile-row">
+              <span class="hero-tile">D</span>
+              <span class="hero-tile">U</span>
+              <span class="hero-tile">E</span>
+              <span class="hero-tile">L</span>
+            </div>
+          </div>
+
+          <p class="hero-subtext">Same word. Two players. One winner.</p>
+
+          <!-- Primary Actions -->
+          <div class="home-btn-group">
+            <button id="create-game-btn" class="btn btn-primary btn-glow">
+              <span class="material-symbols-rounded btn-icon">add_circle</span> Create Game
+            </button>
+            <button id="open-join-modal-btn" class="btn btn-secondary">
+              <span class="material-symbols-rounded btn-icon">key</span> Join with Code
+            </button>
+          </div>
+
+          <!-- Secondary Modes: Bot & Same Device -->
+          <div class="secondary-modes-grid">
+            <button id="play-bot-btn" class="mode-card">
+              <div class="mode-icon"><span class="material-symbols-rounded">smart_toy</span></div>
+              <div class="mode-text">
+                <strong>Play vs Bot</strong>
+                <span>Sharpen your skills</span>
+              </div>
+            </button>
+
+            <button id="same-device-btn" class="mode-card">
+              <div class="mode-icon"><span class="material-symbols-rounded">devices</span></div>
+              <div class="mode-text">
+                <strong>Same Device</strong>
+                <span>Pass & play</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Quick Rules & Legend -->
+          <div class="rules-card">
+            <h4>Five letters. Six chances. Go.</h4>
+            <div class="legend-row">
+              <div class="legend-item"><span class="legend-dot green"></span> Right spot</div>
+              <div class="legend-item"><span class="legend-dot yellow"></span> Wrong spot</div>
+              <div class="legend-item"><span class="legend-dot grey"></span> Not in word</div>
+            </div>
+            <p class="rules-foot">Race a friend to the same secret word. First to solve it takes the crown.<br>
+            <strong>No downloads. No sign up. Just one good rivalry.</strong></p>
+          </div>
+
+          <!-- AD SECTION: Home Screen (Unobtrusive compact banner) -->
+          <aside class="ad-slot-wrapper ad-slot-home" aria-label="Advertisement">
+            <span class="ad-slot-badge">ADVERTISEMENT</span>
+            <div class="ad-slot-content">
+              <!-- Replace data-ad-client and data-ad-slot with your Google Ad details -->
+              <ins class="adsbygoogle"
+                   style="display:block"
+                   data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                   data-ad-slot="XXXXXXXXXX"
+                   data-ad-format="auto"
+                   data-full-width-responsive="true"></ins>
+            </div>
+          </aside>
+
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 2: LOBBY / WAITING (Matches Mockup 2)  -->
+      <!-- ========================================== -->
+      <section id="view-waiting" class="view-panel">
+        <div class="lobby-card">
+          <div class="arena-badge">YOUR ARENA IS READY</div>
+          <h2 class="lobby-title">Bring your rival.</h2>
+          <p class="lobby-sub">Send the code. Settle the score.</p>
+
+          <!-- Room Code Box -->
+          <div class="room-code-panel">
+            <span class="panel-label">ROOM CODE</span>
+            <div class="room-code-display" id="lobby-code-text">WDX7K</div>
+            <p class="panel-hint">Your friend can join with this code.</p>
+
+            <div class="lobby-actions-row">
+              <button id="copy-code-btn" class="btn btn-primary flex-1">
+                <span class="material-symbols-rounded btn-icon">content_copy</span> Copy Code
+              </button>
+              <button id="share-code-btn" class="btn btn-secondary flex-1">
+                <span class="material-symbols-rounded btn-icon">share</span> Share Code
+              </button>
+            </div>
+          </div>
+
+          <!-- Lobby Participants Status -->
+          <div class="waiting-box">
+            <div class="waiting-header">
+              <span class="pulsing-dot"></span> Waiting for opponent...
+            </div>
+            
+            <div class="player-slot active">
+              <div class="slot-info">
+                <strong>You</strong>
+                <span>Room host</span>
+              </div>
+              <span class="ready-badge">Ready <span class="material-symbols-rounded ready-icon">check_circle</span></span>
+            </div>
+
+            <div class="player-slot opponent-empty">
+              <div class="slot-info">
+                <strong>Opponent</strong>
+                <span>This spot has their name on it.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Match Chips -->
+          <div class="chips-row">
+            <span class="chip">5 letters</span>
+            <span class="chip">6 guesses</span>
+            <span class="chip highlight" id="lobby-rounds-chip">3 Rounds</span>
+          </div>
+
+          <!-- AD SECTION: Waiting Lobby (Compact banner in unutilized space) -->
+          <aside class="ad-slot-wrapper ad-slot-lobby" aria-label="Advertisement">
+            <span class="ad-slot-badge">ADVERTISEMENT</span>
+            <div class="ad-slot-content">
+              <ins class="adsbygoogle"
+                   style="display:block"
+                   data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                   data-ad-slot="XXXXXXXXXX"
+                   data-ad-format="auto"
+                   data-full-width-responsive="true"></ins>
+            </div>
+          </aside>
+
+          <p class="lobby-footer-note">
+            The duel starts as soon as your opponent joins. 
+            <button id="lobby-leave-btn" class="inline-link">Leave room</button>
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 3: ACTIVE DUEL ARENA (Mockups 3-5, 7)  -->
+      <!-- ========================================== -->
+      <section id="view-game" class="view-panel">
+
+        <!-- Round Banner / Countdown Overlay -->
+        <div id="round-countdown-overlay" class="round-countdown-overlay" style="display: none;">
+          <div class="countdown-card">
+            <span class="countdown-round-tag" id="countdown-round-label">Round 1</span>
+            <div class="countdown-number" id="countdown-number">3</div>
+            <p class="countdown-text">Get ready to race!</p>
+          </div>
+        </div>
+        
+        <!-- Scoreboard Bar -->
+        <div class="duel-scoreboard">
+          <div class="player-score you-score">
+            <span class="score-name" id="my-score-label">You</span>
+            <span class="score-count" id="my-guesses-count">0 / 6 guesses</span>
+          </div>
+
+          <div class="vs-center-col">
+            <div class="round-pill" id="arena-round-pill">Round 1 / 3</div>
+            <div class="running-score-badge" id="running-score-badge">0 - 0</div>
+          </div>
+
+          <div class="player-score opp-score">
+            <span class="score-name" id="opp-score-label">Opponent</span>
+            <span class="score-count" id="opp-guesses-count">0 / 6 guesses</span>
+          </div>
+        </div>
+
+        <!-- Opponent Live Status Card -->
+        <div class="opponent-live-strip">
+          <div class="opp-live-indicator">
+            <span class="live-dot"></span>
+            <span id="opp-live-text">Opponent LIVE</span>
+          </div>
+          <span class="opp-action-msg" id="opp-action-msg">Ready. Set. Guess.</span>
+          <span class="strip-motto">Their colors. Never their letters.</span>
+        </div>
+
+        <!-- Duel Play Area (16:9 Desktop Friendly + Mobile Stacked) -->
+        <div class="duel-arena-layout">
+          
+          <!-- Primary Board: YOU -->
+          <div class="board-wrapper main-board-wrapper">
+            <div class="board-header-row">
+              <span class="board-heading">YOUR BOARD</span>
+              <span class="guess-phase-tag" id="current-guess-phase">Guess 1 of 6</span>
+            </div>
+            
+            <div class="grid-board" id="my-board">
+              <!-- 6 rows x 5 tiles -->
+            </div>
+          </div>
+
+          <!-- Secondary Board: OPPONENT (Live Colors Only) -->
+          <div class="board-wrapper opp-board-wrapper">
+            <div class="board-header-row">
+              <span class="board-heading">Opponent</span>
+              <span class="opp-guess-tag" id="opp-tag-count">0 / 6 guesses</span>
+            </div>
+
+            <div class="grid-board opponent-grid" id="opponent-board">
+              <!-- 6 rows x 5 color-only mini tiles -->
+            </div>
+
+            <div class="desktop-legend">
+              <span class="legend-title">Read the colors. Find the word.</span>
+              <div class="legend-item"><span class="legend-dot green"></span> Right letter, right spot</div>
+              <div class="legend-item"><span class="legend-dot yellow"></span> Right letter, wrong spot</div>
+              <div class="legend-item"><span class="legend-dot grey"></span> Not in the secret word</div>
+              <p class="legend-desc">You share one secret word, not your guesses. First to solve it takes the crown.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Hint Guidance Line -->
+        <div class="input-guidance-line" id="input-guidance">
+          Five letters. Hit Enter when you're ready.
+        </div>
+
+        <!-- QWERTY Keyboard (With Mobile Touch & Haptics) -->
+        <div class="keyboard" id="keyboard">
+          <div class="keyboard-row">
+            <button class="key" data-key="Q">Q</button>
+            <button class="key" data-key="W">W</button>
+            <button class="key" data-key="E">E</button>
+            <button class="key" data-key="R">R</button>
+            <button class="key" data-key="T">T</button>
+            <button class="key" data-key="Y">Y</button>
+            <button class="key" data-key="U">U</button>
+            <button class="key" data-key="I">I</button>
+            <button class="key" data-key="O">O</button>
+            <button class="key" data-key="P">P</button>
+          </div>
+          <div class="keyboard-row">
+            <div class="key-spacer"></div>
+            <button class="key" data-key="A">A</button>
+            <button class="key" data-key="S">S</button>
+            <button class="key" data-key="D">D</button>
+            <button class="key" data-key="F">F</button>
+            <button class="key" data-key="G">G</button>
+            <button class="key" data-key="H">H</button>
+            <button class="key" data-key="J">J</button>
+            <button class="key" data-key="K">K</button>
+            <button class="key" data-key="L">L</button>
+            <div class="key-spacer"></div>
+          </div>
+          <div class="keyboard-row">
+            <button class="key key-action key-enter" data-key="ENTER">ENTER</button>
+            <button class="key" data-key="Z">Z</button>
+            <button class="key" data-key="X">X</button>
+            <button class="key" data-key="C">C</button>
+            <button class="key" data-key="V">V</button>
+            <button class="key" data-key="B">B</button>
+            <button class="key" data-key="N">N</button>
+            <button class="key" data-key="M">M</button>
+            <button class="key key-action key-backspace" data-key="BACKSPACE" title="Backspace" aria-label="Backspace">
+              <span class="material-symbols-rounded">backspace</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Arena Footer Status -->
+        <div class="arena-footer-bar">
+          <span>● Connected · progress updates live</span>
+          <span class="desktop-only">Your keyboard works here too</span>
+        </div>
+
+        <!-- AD SECTION: In-Arena (Safe bottom space, isolated from keyboard & game board) -->
+        <aside class="ad-slot-wrapper ad-slot-arena" aria-label="Advertisement">
+          <span class="ad-slot-badge">ADVERTISEMENT</span>
+          <div class="ad-slot-content">
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="XXXXXXXXXX"
+                 data-ad-format="horizontal"
+                 data-full-width-responsive="true"></ins>
+          </div>
+        </aside>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: ROOM FULL (Fall-back)              -->
+      <!-- ========================================== -->
+      <section id="view-room-full" class="view-panel">
+        <div class="lobby-card">
+          <div class="arena-badge">ACCESS DENIED</div>
+          <h2>Room Full</h2>
+          <p class="lobby-sub">This arena already has 2 gladiators competing.</p>
+          <button id="room-full-back-btn" class="btn btn-primary btn-glow">Create Your Own Game</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1: ROUND OVER MODAL                  -->
+    <!-- ========================================== -->
+    <div id="round-over-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet">
+        <div class="outcome-crown" id="outcome-crown"><span class="material-symbols-rounded crown-icon">emoji_events</span></div>
+        <div class="round-indicator-pill" id="round-result-pill">ROUND 1 RESULT</div>
+        <h2 class="outcome-title" id="outcome-title">You Won the Round!</h2>
+        <p class="outcome-subtitle" id="outcome-subtitle">Quick mind. Faster finish.</p>
+
+        <!-- Secret Word Revealed -->
+        <div class="secret-word-panel">
+          <span class="secret-label">THE SECRET WORD</span>
+          <div class="secret-tiles-row" id="secret-word-tiles">
+            <!-- 5 green letters -->
+          </div>
+        </div>
+
+        <!-- Match Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <strong id="stat-guesses">3 / 6</strong>
+            <span>YOUR GUESSES</span>
+          </div>
+          <div class="stat-card">
+            <strong id="stat-time">00:48</strong>
+            <span>ROUND TIME</span>
+          </div>
+        </div>
+
+        <!-- Running Score Card -->
+        <div class="running-score-card">
+          <div class="running-score-header">RUNNING SCORE</div>
+          <div class="running-score-values">
+            <div class="score-col">
+              <span class="score-p-name">You</span>
+              <strong class="score-p-num" id="round-my-score">0</strong>
+            </div>
+            <div class="score-col-sep">—</div>
+            <div class="score-col">
+              <span class="score-p-name">Opponent</span>
+              <strong class="score-p-num" id="round-opp-score">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <p class="opp-recap" id="opp-recap-text">Opponent · 2 guesses · Still searching</p>
+
+        <!-- AD SECTION: Round Results (Post-round natural pause) -->
+        <aside class="ad-slot-wrapper ad-slot-modal" aria-label="Advertisement">
+          <span class="ad-slot-badge">ADVERTISEMENT</span>
+          <div class="ad-slot-content">
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="XXXXXXXXXX"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+          </div>
+        </aside>
+
+        <!-- Round Action Buttons -->
+        <div class="modal-btn-stack" id="round-action-stack">
+          <button id="next-round-btn" class="btn btn-primary btn-glow">
+            <span id="next-round-btn-text">Next Round</span>
+          </button>
+          <button id="end-duel-btn" class="btn btn-secondary">
+            End Duel
+          </button>
+        </div>
+
+        <p class="modal-footnote" id="round-modal-footnote">Both players must click Next Round to proceed.</p>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1B: FINAL DUEL RESULTS SCREEN        -->
+    <!-- ========================================== -->
+    <div id="duel-results-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet">
+        <div class="outcome-crown" id="duel-final-crown"><span class="material-symbols-rounded crown-icon">emoji_events</span></div>
+        <h2 class="outcome-title" id="duel-final-title">Victory!</h2>
+        <p class="outcome-subtitle" id="duel-final-subtitle">You won the duel!</p>
+
+        <!-- Final Score Comparison Box -->
+        <div class="final-score-box">
+          <div class="final-player-box you">
+            <span class="fp-label">You</span>
+            <span class="fp-score" id="duel-final-my-score">0</span>
+            <span class="fp-sub">Round Wins</span>
+          </div>
+          <div class="final-vs-text">VS</div>
+          <div class="final-player-box opp">
+            <span class="fp-label">Opponent</span>
+            <span class="fp-score" id="duel-final-opp-score">0</span>
+            <span class="fp-sub">Round Wins</span>
+          </div>
+        </div>
+
+        <!-- Words History List -->
+        <div class="words-history-panel">
+          <div class="history-header">ALL WORDS PLAYED</div>
+          <div class="history-list" id="duel-words-history-list">
+            <!-- List of words played and outcomes -->
+          </div>
+        </div>
+
+        <!-- AD SECTION: Tournament Results (Post-match summary) -->
+        <aside class="ad-slot-wrapper ad-slot-modal" aria-label="Advertisement">
+          <span class="ad-slot-badge">ADVERTISEMENT</span>
+          <div class="ad-slot-content">
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="XXXXXXXXXX"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+          </div>
+        </aside>
+
+        <!-- Final Actions -->
+        <div class="modal-btn-stack">
+          <button id="rematch-btn" class="btn btn-primary btn-glow">
+            <span id="rematch-btn-text">Play Again</span>
+          </button>
+          <button id="back-to-home-btn" class="btn btn-secondary">
+            Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1C: CREATE DUEL SETTINGS MODAL       -->
+    <!-- ========================================== -->
+    <div id="create-duel-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet text-left">
+        <h3 class="modal-heading">Create Duel</h3>
+        <p class="modal-desc">Configure the rounds for your showdown:</p>
+
+        <form id="create-duel-form">
+          <div class="settings-group">
+            <label class="settings-label">ROUNDS MODE</label>
+            <div class="mode-toggle-group">
+              <label class="mode-radio-label active" id="mode-label-fixed">
+                <input type="radio" name="roundsMode" value="fixed" checked>
+                <strong>Fixed Rounds</strong>
+                <span>Set a specific match length</span>
+              </label>
+              <label class="mode-radio-label" id="mode-label-unlimited">
+                <input type="radio" name="roundsMode" value="unlimited">
+                <strong>Unlimited</strong>
+                <span>Play until someone ends duel</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group" id="fixed-rounds-config">
+            <label class="settings-label">TOTAL ROUNDS</label>
+            <div class="preset-pills-row">
+              <button type="button" class="preset-pill" data-rounds="1">1</button>
+              <button type="button" class="preset-pill active" data-rounds="3">3</button>
+              <button type="button" class="preset-pill" data-rounds="5">5</button>
+              <button type="button" class="preset-pill" data-rounds="7">7</button>
+              <button type="button" class="preset-pill" data-rounds="10">10</button>
+            </div>
+            <div class="custom-rounds-row">
+              <span>Or Custom (1-20):</span>
+              <input type="number" id="custom-rounds-input" min="1" max="20" placeholder="1 - 20" value="3">
+            </div>
+          </div>
+
+          <div class="modal-btn-stack">
+            <button type="submit" class="btn btn-primary btn-glow">Create Arena</button>
+            <button type="button" id="close-create-modal-btn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 2: JOIN WITH CODE                   -->
+    <!-- ========================================== -->
+    <div id="join-code-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet">
+        <h3 class="modal-heading">Enter Room Code</h3>
+        <p class="modal-desc">Type your rival's 5 or 6-character room code:</p>
+        
+        <form id="join-code-form" class="join-form">
+          <input type="text" id="modal-code-input" placeholder="e.g. WDX7K" maxlength="8" autocomplete="off" spellcheck="false">
+          <div class="modal-btn-stack">
+            <button type="submit" class="btn btn-primary btn-glow">Join Room</button>
+            <button type="button" id="close-join-modal-btn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 3: HOW TO PLAY                      -->
+    <!-- ========================================== -->
+    <div id="rules-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet text-left">
+        <h3 class="modal-heading">How WordDuel Works</h3>
+        <ul class="rules-list">
+          <li><strong>Same Word:</strong> You and your opponent are solving the exact same secret 5-letter word in real time.</li>
+          <li><strong>Speed & Strategy:</strong> The first player to discover the word takes the crown!</li>
+          <li><strong>Live Progress:</strong> Every time your opponent submits a guess, their color pattern updates live on your screen (letters remain secret).</li>
+          <li><strong>Colors:</strong>
+            <div class="rules-legend-list">
+              <div class="legend-item"><span class="legend-dot green"></span> <strong>Green:</strong> Right letter, right spot</div>
+              <div class="legend-item"><span class="legend-dot yellow"></span> <strong>Yellow:</strong> Right letter, wrong spot</div>
+              <div class="legend-item"><span class="legend-dot grey"></span> <strong>Grey:</strong> Letter not in the word</div>
+            </div>
+          </li>
+          <li><strong>Rematch:</strong> If both players click Rematch, a brand new round begins with a new secret word!</li>
+        </ul>
+        <button id="close-rules-btn" class="btn btn-primary btn-glow full-width">Got it, Let's Play!</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Socket.io local client script -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Main Game Client Script -->
+  <script src="/game.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Reg error:', err));
+      });
+    }
+  </script>
+</body>
+</html>

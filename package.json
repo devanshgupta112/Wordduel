@@ -1,0 +1,31 @@
+{
+  "name": "wordduel",
+  "version": "2.0.0",
+  "description": "WORDDUEL - High-Concurrency 2-Player Real-Time Word Race for Web and Android",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "cluster": "NODE_CLUSTER=true node server.js",
+    "cap:add": "cap add android",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android"
+  },
+  "dependencies": {
+    "@socket.io/cluster-adapter": "^0.2.2",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@socket.io/sticky": "^1.0.4",
+    "compression": "^1.7.4",
+    "express": "^4.19.2",
+    "ioredis": "^5.4.1",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "socket.io-client": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
