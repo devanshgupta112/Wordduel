@@ -66,6 +66,10 @@ Traditional word puzzle games (such as the original Wordle) are asynchronous, so
    - Real-time pulsating status dots, row counters, and live round timers (`⏱ 00:00`).
 5. **Multi-Round Tournament Tracking**:
    - Running scoreboards, round victory modals, match point indicators, and complete post-match word recap histories.
+6. **Customizable Player Nicknames**:
+   - Player display name card with random nickname generator (`🎲`) on the home screen.
+   - Synchronized across online multiplayer lobbies, real-time match scoreboard headers, opponent boards, and victory screens.
+   - Persistent across browser sessions via local storage.
 
 ---
 
@@ -310,17 +314,17 @@ sequenceDiagram
 
 | Event Name | Direction | Payload Parameters | Description |
 | :--- | :--- | :--- | :--- |
-| `join_room` | Client ➔ Server | `{ roomId, playerId, roundsMode, totalRounds }` | Joins or initializes a duel room. |
-| `room_joined` | Server ➔ Client | `{ playerNum, roomId, status, roundsMode, totalRounds }` | Acknowledges room assignment. |
-| `opponent_joined`| Server ➔ Client | `{ roundsMode, totalRounds }` | Notifies Player 1 that Player 2 has entered. |
-| `round_countdown`| Server ➔ Client | `{ currentRound, seconds: 3, score }` | Initiates synchronized 3s pre-round countdown. |
-| `round_start` | Server ➔ Client | `{ currentRound, startTime, score }` | Unlocks input boards and starts round stopwatch. |
+| `join_room` | Client ➔ Server | `{ roomId, playerId, playerName?, roundsMode, totalRounds }` | Joins or initializes a duel room with custom display name. |
+| `room_joined` | Server ➔ Client | `{ playerNum, roomId, status, playerName, players, roundsMode, totalRounds }` | Acknowledges room assignment and profile data. |
+| `opponent_joined`| Server ➔ Client | `{ roundsMode, totalRounds, players }` | Notifies Player 1 that opponent has entered with profile data. |
+| `round_countdown`| Server ➔ Client | `{ currentRound, seconds: 3, score, players }` | Initiates synchronized 3s pre-round countdown. |
+| `round_start` | Server ➔ Client | `{ currentRound, startTime, score, players }` | Unlocks input boards and starts round stopwatch. |
 | `submit_guess` | Client ➔ Server | `{ roomId, playerId, guess }` | Submits a 5-letter word for evaluation. |
 | `guess_result` | Server ➔ Client | `{ guess, evaluation, row }` | Authoritative letters + colors sent to guesser. |
 | `opponent_guess_result` | Server ➔ Rival | `{ evaluation, row }` | **Colors only** (letters masked) sent to opponent. |
 | `player_finished_round` | Server ➔ Client | `{ message }` | Notifies player all 6 guesses are used while awaiting opponent. |
-| `round_over` | Server ➔ Client | `{ winnerPlayerNum, secretWord, scores, isDuelOver }` | Concludes round, reveals word, updates score. |
-| `duel_finished` | Server ➔ Client | `{ duelWinnerPlayerNum, scores, wordsHistory }` | Concludes tournament series with full recap. |
+| `round_over` | Server ➔ Client | `{ winnerPlayerNum, winnerName, secretWord, scores, players, isDuelOver }` | Concludes round, reveals word, updates score. |
+| `duel_finished` | Server ➔ Client | `{ duelWinnerPlayerNum, winnerName, scores, players, wordsHistory }` | Concludes tournament series with full recap. |
 
 ---
 
@@ -349,12 +353,15 @@ Defined in [`public/style.css`](public/style.css):
 - **Organic Rounded Radii**: Tiles, buttons, and dialogs feature generous border radii (12px–28px) avoiding harsh geometric corners.
 - **3D Card Flip Animation**: Tile reveals use 3D perspective transformations (`rotateX(90deg)`) staggered by `0.15s` per column.
 - **Shake Error States**: Invalid words trigger a horizontal CSS shake animation (`transform: translateX(...)`) with red highlight borders.
+- **Key-Pop Tactile Response**: Active keypresses and mobile touches trigger a spring pop animation (`transform: translateY(-4px) scale(1.14)` with vibrant purple glow and brightness boost) with 0ms pointer delay.
 
-### 7.2 Mobile Safe Area Insets & Zero-CLS Ad Integration
+### 7.2 Mobile & iOS Engineering
 
+- **Fluid Tile Scaling with CSS `clamp()`**: Main board (`--tile-size: clamp(38px, 9.5vw, 54px)`) and opponent mini board (`--mini-tile-size: clamp(14px, 3.8vw, 22px)`) dynamically scale down to prevent horizontal clipping on narrow mobile viewports.
+- **Dynamic Viewport Height (`100dvh`)**: Avoids keyboard and toolbar jumpiness across mobile browsers and iOS Safari.
 - **Viewport Notch Protection**: Layout containers incorporate `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`.
-- **Cumulative Layout Shift (CLS) Protection**: Dedicated `.ad-slot-wrapper` units reserve exact layout dimensions with styled borders and an `ADVERTISEMENT` tag before ad assets populate.
-- **Dynamic Mobile Space Protection**: On short mobile viewports (`@media (max-height: 720px)`), arena bottom banner ads automatically hide to preserve complete keyboard typing visibility.
+- **Short Screen Breakpoints**: `@media (max-height: 720px)` compacts header padding, board gaps, and hides non-essential banners so boards and virtual keyboard stay fully visible without scrolling.
+- **0ms Pointerdown Touch Response**: Replaced sluggish 300ms mobile click handlers with `pointerdown` listeners and `touch-action: manipulation`.
 
 ### 7.3 Touch Haptics & Native Web Share Sheet
 
