@@ -69,7 +69,7 @@ if (loadedCommon && loadedCommon.length > 0) {
   answersList = wordsData.answers.map(w => w.toLowerCase());
 }
 
-// 2. Valid guess list: five_letter_words.txt + answer list (fallback to words.json allowed + answer list if not present)
+// 2. Valid guess list: five_letter_words.txt + words.json + common_five_letter_words.txt
 const allowedSet = new Set();
 const fiveWordsPathData = path.join(__dirname, 'data', 'five_letter_words.txt');
 const fiveWordsPathPublic = path.join(__dirname, 'public', 'five_letter_words.txt');
@@ -77,19 +77,27 @@ const loadedGuesses = loadWordListFile(fiveWordsPathData) || loadWordListFile(fi
 
 if (loadedGuesses && loadedGuesses.length > 0) {
   loadedGuesses.forEach(w => allowedSet.add(w));
-} else {
-  // If five_letter_words.txt hasn't been added, use answer list plus words.json allowed for validation
-  if (fs.existsSync(path.join(__dirname, 'words.json'))) {
-    try {
-      const wordsData = JSON.parse(fs.readFileSync(path.join(__dirname, 'words.json'), 'utf8'));
-      if (Array.isArray(wordsData.allowed)) {
-        wordsData.allowed.forEach(w => allowedSet.add(w.toLowerCase()));
-      }
-    } catch (e) {}
-  }
 }
-// Guesses are accepted if in either list
-answersList.forEach(w => allowedSet.add(w));
+
+// Load full official Wordle dictionary (10,000+ words) from words.json
+const wordsJsonPath = fs.existsSync(path.join(__dirname, 'public', 'words.json'))
+  ? path.join(__dirname, 'public', 'words.json')
+  : path.join(__dirname, 'words.json');
+
+if (fs.existsSync(wordsJsonPath)) {
+  try {
+    const wordsData = JSON.parse(fs.readFileSync(wordsJsonPath, 'utf8'));
+    if (Array.isArray(wordsData.allowed)) {
+      wordsData.allowed.forEach(w => allowedSet.add(w.toLowerCase().trim()));
+    }
+    if (Array.isArray(wordsData.answers)) {
+      wordsData.answers.forEach(w => allowedSet.add(w.toLowerCase().trim()));
+    }
+  } catch (e) {}
+}
+
+// Answers list words are always allowed guesses
+answersList.forEach(w => allowedSet.add(w.toLowerCase().trim()));
 
 function startWorker() {
   const app = express();
@@ -144,6 +152,14 @@ function startWorker() {
     maxAge: '1d',
     etag: true
   }));
+
+  // Explicit route for words.json dictionary
+  app.get('/words.json', (req, res) => {
+    const p = fs.existsSync(path.join(__dirname, 'public', 'words.json'))
+      ? path.join(__dirname, 'public', 'words.json')
+      : path.join(__dirname, 'words.json');
+    res.sendFile(p);
+  });
 
   // Route support
   app.get(['/', '/room/:roomId'], (req, res) => {

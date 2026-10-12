@@ -45,6 +45,7 @@
 
   // Offline / Bot word dictionary cache
   let localWords = { answers: [], allowed: [] };
+  const localAllowedSet = new Set();
   let botSecretWord = '';
   let botInterval = null;
   let botUsedWords = [];
@@ -156,10 +157,9 @@
   }
 
   function getSavedPlayerName() {
-    let saved = localStorage.getItem('wordduel_player_name');
+    const saved = localStorage.getItem('wordduel_player_name');
     if (!saved || !saved.trim()) {
-      saved = getRandomFunName();
-      localStorage.setItem('wordduel_player_name', saved);
+      return '';
     }
     return saved.trim().slice(0, 15);
   }
@@ -168,30 +168,47 @@
   let oppPlayerName = 'Opponent';
 
   function setPlayerName(name) {
-    const clean = (name || '').trim().slice(0, 15) || 'Player 1';
+    const clean = (name || '').trim().slice(0, 15);
     myPlayerName = clean;
-    localStorage.setItem('wordduel_player_name', clean);
-    sessionStorage.setItem('wordduel_player_name', clean);
-    if (playerNameInput && playerNameInput.value !== clean) {
+    if (clean) {
+      localStorage.setItem('wordduel_player_name', clean);
+      sessionStorage.setItem('wordduel_player_name', clean);
+    } else {
+      localStorage.removeItem('wordduel_player_name');
+      sessionStorage.removeItem('wordduel_player_name');
+    }
+    if (playerNameInput && document.activeElement !== playerNameInput) {
       playerNameInput.value = clean;
     }
     updateAllNameElements();
     return clean;
   }
 
+  function ensurePlayerName() {
+    if (!myPlayerName || !myPlayerName.trim()) {
+      const generated = getRandomFunName();
+      setPlayerName(generated);
+      if (playerNameInput) {
+        playerNameInput.value = generated;
+      }
+    }
+    return myPlayerName;
+  }
+
   function updateAllNameElements() {
     if (playerNameInput && document.activeElement !== playerNameInput) {
       playerNameInput.value = myPlayerName;
     }
-    if (myScoreLabel) myScoreLabel.textContent = `${myPlayerName} (You)`;
+    const displayName = myPlayerName || 'You';
+    if (myScoreLabel) myScoreLabel.textContent = `${displayName} (You)`;
     if (oppScoreLabel) oppScoreLabel.textContent = oppPlayerName;
     if (oppBoardHeading) oppBoardHeading.textContent = `${oppPlayerName}'s Board`;
     if (oppLiveText) oppLiveText.textContent = `${oppPlayerName} LIVE`;
-    if (lobbyP1Name) lobbyP1Name.textContent = `${myPlayerName} (You)`;
+    if (lobbyP1Name) lobbyP1Name.textContent = `${displayName} (You)`;
     if (lobbyP2Name) lobbyP2Name.textContent = (oppPlayerName && oppPlayerName !== 'Opponent') ? oppPlayerName : 'Opponent';
-    if (roundMyNameLabel) roundMyNameLabel.textContent = myPlayerName;
+    if (roundMyNameLabel) roundMyNameLabel.textContent = displayName;
     if (roundOppNameLabel) roundOppNameLabel.textContent = oppPlayerName;
-    if (duelFinalMyLabel) duelFinalMyLabel.textContent = myPlayerName;
+    if (duelFinalMyLabel) duelFinalMyLabel.textContent = displayName;
     if (duelFinalOppLabel) duelFinalOppLabel.textContent = oppPlayerName;
     updateMobileTabCounters();
   }
@@ -267,22 +284,43 @@
     reconnectionDelay: 1000
   });
 
-  // Fetch word list for Bot mode
-  fetch('/common_five_letter_words.txt')
-    .then(r => {
-      if (r.ok) return r.text();
-      return fetch('/words.json').then(res => res.json());
-    })
-    .then(data => {
-      if (typeof data === 'string') {
-        const words = data.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length === 5);
-        localWords.answers = words;
-        localWords.allowed = words;
-      } else if (data && data.answers) {
-        localWords = data;
+  // Fetch full dictionary for validation & bot mode
+  function loadWordDictionaries() {
+    Promise.allSettled([
+      fetch('/words.json').then(r => r.json()),
+      fetch('/common_five_letter_words.txt').then(r => r.text())
+    ]).then(results => {
+      // 1. Process words.json (official Wordle dataset)
+      if (results[0].status === 'fulfilled' && results[0].value) {
+        const data = results[0].value;
+        if (Array.isArray(data.answers)) {
+          localWords.answers = data.answers.map(w => w.trim().toLowerCase());
+          data.answers.forEach(w => localAllowedSet.add(w.trim().toLowerCase()));
+        }
+        if (Array.isArray(data.allowed)) {
+          localWords.allowed = data.allowed.map(w => w.trim().toLowerCase());
+          data.allowed.forEach(w => localAllowedSet.add(w.trim().toLowerCase()));
+        }
       }
-    })
-    .catch(() => {});
+      // 2. Process common_five_letter_words.txt
+      if (results[1].status === 'fulfilled' && typeof results[1].value === 'string') {
+        const textWords = results[1].value.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length === 5);
+        textWords.forEach(w => localAllowedSet.add(w));
+        if (!localWords.answers || localWords.answers.length === 0) {
+          localWords.answers = textWords;
+        }
+      }
+    }).catch(() => {});
+  }
+  loadWordDictionaries();
+
+  function isWordInDictionary(word) {
+    if (!word || typeof word !== 'string') return false;
+    const clean = word.trim().toLowerCase();
+    if (clean.length !== 5 || !/^[a-z]{5}$/.test(clean)) return false;
+    if (localAllowedSet.size === 0) return true; // safety fallback only if network failed completely
+    return localAllowedSet.has(clean);
+  }
 
   // --- Haptic Feedback for Android ---
   function triggerHaptic(type = 'light') {
@@ -539,6 +577,14 @@
       return;
     }
 
+    const clean = currentGuess.trim().toLowerCase();
+    if (!isWordInDictionary(clean)) {
+      triggerHaptic('error');
+      shakeCurrentRow();
+      showToast('Not in word list');
+      return;
+    }
+
     isLocked = true;
     inputGuidance.textContent = 'Checking your guess…';
 
@@ -654,6 +700,7 @@
 
   // --- Online Room Joining ---
   function enterOnlineRoom(roomId, roomConfig) {
+    ensurePlayerName();
     gameMode = 'online';
     currentRoomId = roomId.toUpperCase();
     headerRoomCode.textContent = currentRoomId;
@@ -680,6 +727,7 @@
 
   // --- Mode 2: Play vs Bot (Solo Practice) ---
   function startBotGame() {
+    ensurePlayerName();
     gameMode = 'bot';
     currentRoomId = 'BOT-ARENA';
     headerRoomCode.textContent = 'VS BOT';
@@ -822,7 +870,16 @@
   }
 
   function evaluateBotGameGuess(guess) {
-    const clean = guess.toLowerCase();
+    const clean = (guess || '').trim().toLowerCase();
+    if (!isWordInDictionary(clean)) {
+      triggerHaptic('error');
+      shakeCurrentRow();
+      showToast('Not in word list');
+      isLocked = false;
+      inputGuidance.textContent = 'Five letters. Hit Enter when you\'re ready.';
+      return;
+    }
+
     const evaluation = evaluateOffline(clean, botSecretWord);
     const row = currentRow;
 
@@ -980,16 +1037,13 @@
     playerNameInput.addEventListener('input', (e) => {
       setPlayerName(e.target.value);
     });
-    playerNameInput.addEventListener('blur', (e) => {
-      if (!e.target.value.trim()) {
-        setPlayerName(getRandomFunName());
-      }
-    });
   }
 
   if (randomNameBtn) {
     randomNameBtn.addEventListener('click', () => {
-      setPlayerName(getRandomFunName());
+      const fun = getRandomFunName();
+      setPlayerName(fun);
+      if (playerNameInput) playerNameInput.value = fun;
       triggerHaptic('light');
     });
   }
