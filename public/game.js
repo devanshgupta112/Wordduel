@@ -93,10 +93,89 @@
   const oppActionMsg = document.getElementById('opp-action-msg');
   const currentGuessPhase = document.getElementById('current-guess-phase');
   const oppTagCount = document.getElementById('opp-tag-count');
+  const oppBoardHeading = document.getElementById('opp-board-heading');
   const inputGuidance = document.getElementById('input-guidance');
   const myBoard = document.getElementById('my-board');
   const opponentBoard = document.getElementById('opponent-board');
   const keyboard = document.getElementById('keyboard');
+
+  // Player Display Name Elements
+  const playerNameInput = document.getElementById('player-name-input');
+  const randomNameBtn = document.getElementById('random-name-btn');
+  const lobbyP1Name = document.getElementById('lobby-p1-name');
+  const lobbyP1Sub = document.getElementById('lobby-p1-sub');
+  const lobbyP2Slot = document.getElementById('lobby-p2-slot');
+  const lobbyP2Name = document.getElementById('lobby-p2-name');
+  const lobbyP2Sub = document.getElementById('lobby-p2-sub');
+  const lobbyP2Badge = document.getElementById('lobby-p2-badge');
+  const roundMyNameLabel = document.getElementById('round-my-name-label');
+  const roundOppNameLabel = document.getElementById('round-opp-name-label');
+  const duelFinalMyLabel = document.getElementById('duel-final-my-label');
+  const duelFinalOppLabel = document.getElementById('duel-final-opp-label');
+
+  // Nickname State & Generator
+  const FUN_NAMES = ['SpeedyWord', 'WordWizard', 'LetterNinja', 'LexiconKing', 'CipherPro', 'WordDuelist', 'DailySolver', 'BrainyFox', 'FlashTyper', 'PuzzleAce', 'VowelHunter', 'SyntaxGladiator'];
+  function getRandomFunName() {
+    return FUN_NAMES[Math.floor(Math.random() * FUN_NAMES.length)];
+  }
+
+  function getSavedPlayerName() {
+    let saved = localStorage.getItem('wordduel_player_name');
+    if (!saved || !saved.trim()) {
+      saved = getRandomFunName();
+      localStorage.setItem('wordduel_player_name', saved);
+    }
+    return saved.trim().slice(0, 15);
+  }
+
+  let myPlayerName = getSavedPlayerName();
+  let oppPlayerName = 'Opponent';
+
+  function setPlayerName(name) {
+    const clean = (name || '').trim().slice(0, 15) || 'Player 1';
+    myPlayerName = clean;
+    localStorage.setItem('wordduel_player_name', clean);
+    sessionStorage.setItem('wordduel_player_name', clean);
+    if (playerNameInput && playerNameInput.value !== clean) {
+      playerNameInput.value = clean;
+    }
+    updateAllNameElements();
+    return clean;
+  }
+
+  function updateAllNameElements() {
+    if (playerNameInput && document.activeElement !== playerNameInput) {
+      playerNameInput.value = myPlayerName;
+    }
+    if (myScoreLabel) myScoreLabel.textContent = `${myPlayerName} (You)`;
+    if (oppScoreLabel) oppScoreLabel.textContent = oppPlayerName;
+    if (oppBoardHeading) oppBoardHeading.textContent = `${oppPlayerName}'s Board`;
+    if (oppLiveText) oppLiveText.textContent = `${oppPlayerName} LIVE`;
+    if (lobbyP1Name) lobbyP1Name.textContent = `${myPlayerName} (You)`;
+    if (lobbyP2Name) lobbyP2Name.textContent = (oppPlayerName && oppPlayerName !== 'Opponent') ? oppPlayerName : 'Opponent';
+    if (roundMyNameLabel) roundMyNameLabel.textContent = myPlayerName;
+    if (roundOppNameLabel) roundOppNameLabel.textContent = oppPlayerName;
+    if (duelFinalMyLabel) duelFinalMyLabel.textContent = myPlayerName;
+    if (duelFinalOppLabel) duelFinalOppLabel.textContent = oppPlayerName;
+  }
+
+  function updatePlayersFromData(data) {
+    if (data && data.players) {
+      const myObj = data.players[playerNum];
+      const oppObj = data.players[playerNum === 1 ? 2 : 1];
+      if (myObj && myObj.name) myPlayerName = myObj.name;
+      if (oppObj && oppObj.name) {
+        oppPlayerName = oppObj.name;
+        if (lobbyP2Slot) {
+          lobbyP2Slot.classList.remove('opponent-empty');
+          lobbyP2Slot.classList.add('active');
+        }
+        if (lobbyP2Sub) lobbyP2Sub.textContent = 'Challenger';
+        if (lobbyP2Badge) lobbyP2Badge.style.display = 'inline-flex';
+      }
+    }
+    updateAllNameElements();
+  }
 
   // Modals
   const createDuelModal = document.getElementById('create-duel-modal');
@@ -551,6 +630,7 @@
     socket.emit('join_room', {
       roomId: currentRoomId,
       playerId: playerId,
+      playerName: myPlayerName,
       roundsMode: roomConfig ? roomConfig.roundsMode : undefined,
       totalRounds: roomConfig ? roomConfig.totalRounds : undefined
     });
@@ -568,14 +648,12 @@
     scores = { player1: 0, player2: 0 };
     wordsHistory = [];
     botUsedWords = [];
+    oppPlayerName = 'Bot AI 🤖';
 
     pickBotWord();
     resetRoundState();
     switchView('game');
-
-    myScoreLabel.textContent = 'You';
-    oppScoreLabel.textContent = 'Bot (AI)';
-    oppLiveText.textContent = 'Bot LIVE';
+    updateAllNameElements();
 
     playRoundCountdown(currentRound, () => {
       gameStatus = 'playing';
@@ -845,12 +923,33 @@
   });
 
   playBotBtn.addEventListener('click', () => {
+    oppPlayerName = 'Bot AI 🤖';
     startBotGame();
   });
 
   sameDeviceBtn.addEventListener('click', () => {
+    oppPlayerName = 'Player 2';
     startBotGame();
   });
+
+  if (playerNameInput) {
+    playerNameInput.value = myPlayerName;
+    playerNameInput.addEventListener('input', (e) => {
+      setPlayerName(e.target.value);
+    });
+    playerNameInput.addEventListener('blur', (e) => {
+      if (!e.target.value.trim()) {
+        setPlayerName(getRandomFunName());
+      }
+    });
+  }
+
+  if (randomNameBtn) {
+    randomNameBtn.addEventListener('click', () => {
+      setPlayerName(getRandomFunName());
+      triggerHaptic('light');
+    });
+  }
 
   if (copyInviteBtn) {
     copyInviteBtn.addEventListener('click', () => {
@@ -942,22 +1041,60 @@
     }
   });
 
+  // Tactile Key Pop Animation
+  function triggerKeyPop(keyVal) {
+    if (!keyVal) return;
+    const keyEl = keyboard.querySelector(`.key[data-key="${keyVal}"]`);
+    if (keyEl) {
+      keyEl.classList.remove('key-pop');
+      void keyEl.offsetWidth; // Force CSS reflow to replay animation
+      keyEl.classList.add('key-pop');
+      setTimeout(() => {
+        keyEl.classList.remove('key-pop');
+      }, 160);
+    }
+  }
+
   // Physical Keyboard Listener
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (document.activeElement === modalCodeInput || document.activeElement === customRoundsInput) return;
+    if (document.activeElement === modalCodeInput || document.activeElement === customRoundsInput || document.activeElement === playerNameInput) return;
 
-    if (e.key === 'Enter') handleInput('ENTER');
-    else if (e.key === 'Backspace') handleInput('BACKSPACE');
-    else if (/^[a-zA-Z]$/.test(e.key)) handleInput(e.key.toUpperCase());
+    let keyVal = null;
+    if (e.key === 'Enter') keyVal = 'ENTER';
+    else if (e.key === 'Backspace') keyVal = 'BACKSPACE';
+    else if (/^[a-zA-Z]$/.test(e.key)) keyVal = e.key.toUpperCase();
+
+    if (keyVal) {
+      triggerKeyPop(keyVal);
+      handleInput(keyVal);
+    }
   });
 
-  // Virtual Keyboard
+  // Virtual Keyboard (optimized with pointerdown for 0ms delay on touch/iOS)
+  let lastVirtualPointerTime = 0;
+  keyboard.addEventListener('pointerdown', (e) => {
+    const keyEl = e.target.closest('.key');
+    if (!keyEl) return;
+    e.preventDefault(); // Prevents simulated 300ms click delay & text selection
+    lastVirtualPointerTime = Date.now();
+    const keyVal = keyEl.getAttribute('data-key');
+    if (keyVal) {
+      triggerKeyPop(keyVal);
+      handleInput(keyVal);
+    }
+  });
+
+  // Fallback click listener for browsers without pointerdown support
   keyboard.addEventListener('click', (e) => {
+    if (Date.now() - lastVirtualPointerTime < 350) return; // Prevent double trigger
     const keyEl = e.target.closest('.key');
     if (!keyEl) return;
     const keyVal = keyEl.getAttribute('data-key');
-    if (keyVal) handleInput(keyVal);
+    if (keyVal) {
+      triggerKeyPop(keyVal);
+      handleInput(keyVal);
+    }
   });
 
   // --- Socket.io Gameplay Handlers ---
@@ -970,6 +1107,7 @@
     if (lobbyRoundsChip) {
       lobbyRoundsChip.textContent = roundsMode === 'unlimited' ? 'Unlimited' : `${totalRounds} Rounds`;
     }
+    updatePlayersFromData(data);
     switchView('waiting');
   });
 
@@ -979,7 +1117,8 @@
     if (lobbyRoundsChip) {
       lobbyRoundsChip.textContent = roundsMode === 'unlimited' ? 'Unlimited' : `${totalRounds} Rounds`;
     }
-    showToast('Opponent joined! Duel starting…');
+    updatePlayersFromData(data);
+    showToast(`${oppPlayerName} joined! Duel starting…`);
   });
 
   socket.on('room_full', () => {
@@ -993,8 +1132,7 @@
     scores = data.score || scores;
     gameStatus = 'countdown';
 
-    myScoreLabel.textContent = `You (Player ${playerNum})`;
-    oppScoreLabel.textContent = `Opponent (P${playerNum === 1 ? 2 : 1})`;
+    updatePlayersFromData(data);
 
     resetRoundState();
     switchView('game');
@@ -1008,6 +1146,7 @@
     roundsMode = data.roundsMode;
     scores = data.score || scores;
 
+    updatePlayersFromData(data);
     roundCountdownOverlay.style.display = 'none';
     updateRoundAndScoreDisplay();
     startStopwatch(data.startTime);
@@ -1023,6 +1162,7 @@
     currentRound = state.currentRound || 1;
     scores = { player1: state.scores[1] || 0, player2: state.scores[2] || 0 };
     wordsHistory = state.wordsHistory || [];
+    updatePlayersFromData(state);
 
     if (state.status === 'waiting') {
       if (lobbyRoundsChip) {
@@ -1113,7 +1253,7 @@
     opponentRowCount = row + 1;
     oppGuessesCount.textContent = `${opponentRowCount} / 6 guesses`;
     oppTagCount.textContent = `${opponentRowCount} / 6 guesses`;
-    oppActionMsg.textContent = `Opponent submitted guess ${opponentRowCount}/6!`;
+    oppActionMsg.textContent = `${oppPlayerName} submitted guess ${opponentRowCount}/6!`;
 
     for (let c = 0; c < 5; c++) {
       const mt = document.getElementById(`opp-tile-${row}-${c}`);
@@ -1123,7 +1263,7 @@
     }
 
     setTimeout(() => {
-      if (gameStatus === 'playing') oppActionMsg.textContent = 'Thinking of their next word…';
+      if (gameStatus === 'playing') oppActionMsg.textContent = `${oppPlayerName} is thinking of their next word…`;
     }, 2800);
   });
 
@@ -1139,6 +1279,7 @@
     stopStopwatch();
     scores = data.scores || scores;
     wordsHistory = data.wordsHistory || wordsHistory;
+    updatePlayersFromData(data);
 
     setTimeout(() => {
       showRoundOverModal(data);
@@ -1181,12 +1322,12 @@
       outcomeCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">emoji_events</span>';
       outcomeTitle.textContent = 'Round Won!';
       outcomeSubtitle.textContent = 'Quick mind. Faster finish.';
-      oppRecapText.textContent = `Opponent · ${opponentRowCount} guesses · Still searching`;
+      oppRecapText.textContent = `${oppPlayerName} · ${opponentRowCount} guesses · Still searching`;
     } else {
       outcomeCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">sentiment_dissatisfied</span>';
       outcomeTitle.textContent = 'Round Lost';
-      outcomeSubtitle.textContent = reason || 'Opponent solved the secret word first!';
-      oppRecapText.textContent = `Opponent reached the finish line first!`;
+      outcomeSubtitle.textContent = reason || `${oppPlayerName} solved the secret word first!`;
+      oppRecapText.textContent = `${oppPlayerName} reached the finish line first!`;
     }
 
     if (isDuelOver) {
@@ -1211,7 +1352,7 @@
   });
 
   socket.on('opponent_ready_next_round', () => {
-    showToast('Opponent is ready for Next Round! Click Next Round to start.');
+    showToast(`${oppPlayerName} is ready for Next Round! Click Next Round to start.`);
   });
 
   // Final Duel Over Handler
@@ -1219,6 +1360,7 @@
     gameStatus = 'duel_ended';
     isLocked = true;
     stopStopwatch();
+    updatePlayersFromData(data);
     roundOverModal.style.display = 'none';
     showFinalDuelResults(data);
   });
@@ -1245,7 +1387,7 @@
     } else {
       duelFinalCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">military_tech</span>';
       duelFinalTitle.textContent = 'Duel Defeat';
-      duelFinalSubtitle.textContent = reason || 'Opponent won the overall duel.';
+      duelFinalSubtitle.textContent = reason || `${oppPlayerName} won the overall duel.`;
     }
 
     // Populate words history
@@ -1258,7 +1400,7 @@
 
         let winLabel = 'Draw';
         if (h.winnerPlayerNum) {
-          winLabel = h.winnerPlayerNum === playerNum ? 'You won' : 'Opponent won';
+          winLabel = h.winnerPlayerNum === playerNum ? `${myPlayerName} won` : `${oppPlayerName} won`;
         }
 
         item.innerHTML = `
@@ -1277,7 +1419,7 @@
   }
 
   socket.on('opponent_wants_rematch', () => {
-    showToast('Opponent requested Play Again! Click to accept.');
+    showToast(`${oppPlayerName} requested Play Again! Click to accept.`);
   });
 
   socket.on('rematch_status', () => {
@@ -1304,11 +1446,12 @@
   socket.on('opponent_reconnected', () => {
     if (disconnectInterval) clearInterval(disconnectInterval);
     disconnectBanner.style.display = 'none';
-    showToast('Opponent reconnected! Game resumed.');
+    showToast(`${oppPlayerName} reconnected! Game resumed.`);
   });
 
   // --- Initial Boot ---
   initBoards();
+  updateAllNameElements();
   const path = window.location.pathname;
   const match = path.match(/\/room\/([a-zA-Z0-9]+)/);
   if (match && match[1]) {

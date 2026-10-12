@@ -91,6 +91,20 @@
 
           <p class="hero-subtext">Same word. Two players. One winner.</p>
 
+          <!-- Player Nickname Customization -->
+          <div class="player-name-card">
+            <div class="player-name-header">
+              <span class="material-symbols-rounded name-icon">badge</span>
+              <span>YOUR DISPLAY NAME</span>
+            </div>
+            <div class="player-name-input-row">
+              <input type="text" id="player-name-input" class="player-name-field" maxlength="15" placeholder="Enter your name..." value="Player 1" autocomplete="off" spellcheck="false" />
+              <button type="button" id="random-name-btn" class="random-name-btn" title="Random nickname">
+                <span class="material-symbols-rounded">casino</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Primary Actions -->
           <div class="home-btn-group">
             <button id="create-game-btn" class="btn btn-primary btn-glow">
@@ -182,17 +196,18 @@
             
             <div class="player-slot active">
               <div class="slot-info">
-                <strong>You</strong>
-                <span>Room host</span>
+                <strong id="lobby-p1-name">You</strong>
+                <span id="lobby-p1-sub">Room host</span>
               </div>
               <span class="ready-badge">Ready <span class="material-symbols-rounded ready-icon">check_circle</span></span>
             </div>
 
-            <div class="player-slot opponent-empty">
+            <div class="player-slot opponent-empty" id="lobby-p2-slot">
               <div class="slot-info">
-                <strong>Opponent</strong>
-                <span>This spot has their name on it.</span>
+                <strong id="lobby-p2-name">Opponent</strong>
+                <span id="lobby-p2-sub">This spot has their name on it.</span>
               </div>
+              <span class="ready-badge" id="lobby-p2-badge" style="display: none;">Ready <span class="material-symbols-rounded ready-icon">check_circle</span></span>
             </div>
           </div>
 
@@ -283,7 +298,7 @@
           <!-- Secondary Board: OPPONENT (Live Colors Only) -->
           <div class="board-wrapper opp-board-wrapper">
             <div class="board-header-row">
-              <span class="board-heading">Opponent</span>
+              <span class="board-heading" id="opp-board-heading">Opponent</span>
               <span class="opp-guess-tag" id="opp-tag-count">0 / 6 guesses</span>
             </div>
 
@@ -419,12 +434,12 @@
           <div class="running-score-header">RUNNING SCORE</div>
           <div class="running-score-values">
             <div class="score-col">
-              <span class="score-p-name">You</span>
+              <span class="score-p-name" id="round-my-name-label">You</span>
               <strong class="score-p-num" id="round-my-score">0</strong>
             </div>
             <div class="score-col-sep">—</div>
             <div class="score-col">
-              <span class="score-p-name">Opponent</span>
+              <span class="score-p-name" id="round-opp-name-label">Opponent</span>
               <strong class="score-p-num" id="round-opp-score">0</strong>
             </div>
           </div>
@@ -471,13 +486,13 @@
         <!-- Final Score Comparison Box -->
         <div class="final-score-box">
           <div class="final-player-box you">
-            <span class="fp-label">You</span>
+            <span class="fp-label" id="duel-final-my-label">You</span>
             <span class="fp-score" id="duel-final-my-score">0</span>
             <span class="fp-sub">Round Wins</span>
           </div>
           <div class="final-vs-text">VS</div>
           <div class="final-player-box opp">
-            <span class="fp-label">Opponent</span>
+            <span class="fp-label" id="duel-final-opp-label">Opponent</span>
             <span class="fp-score" id="duel-final-opp-score">0</span>
             <span class="fp-sub">Round Wins</span>
           </div>

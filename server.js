@@ -205,6 +205,19 @@ function startWorker() {
     return result;
   }
 
+  // Helper to extract player public profile summary
+  function getRoomPlayers(room) {
+    const list = {};
+    for (const p of Object.values(room.players)) {
+      list[p.playerNum] = {
+        id: p.id,
+        playerNum: p.playerNum,
+        name: p.name || `Player ${p.playerNum}`
+      };
+    }
+    return list;
+  }
+
   // Helper to start or advance a round
   function startNextRound(room) {
     room.currentRound++;
@@ -232,7 +245,8 @@ function startWorker() {
       score: {
         player1: room.scores[1] || 0,
         player2: room.scores[2] || 0
-      }
+      },
+      players: getRoomPlayers(room)
     });
 
     if (room.countdownTimer) clearTimeout(room.countdownTimer);
@@ -249,7 +263,8 @@ function startWorker() {
         score: {
           player1: room.scores[1] || 0,
           player2: room.scores[2] || 0
-        }
+        },
+        players: getRoomPlayers(room)
       });
     }, 3000);
   }
@@ -274,8 +289,11 @@ function startWorker() {
       isDraw = true;
     }
 
+    const winnerObj = duelWinnerPlayerNum ? Object.values(room.players).find(p => p.playerNum === duelWinnerPlayerNum) : null;
+
     io.to(room.id).emit('duel_finished', {
       duelWinnerPlayerNum,
+      duelWinnerName: winnerObj ? winnerObj.name : null,
       isDraw,
       reason: reason || 'Duel completed!',
       scores: {
@@ -285,7 +303,8 @@ function startWorker() {
       roundsPlayed: room.currentRound,
       roundsMode: room.roundsMode,
       totalRounds: room.totalRounds,
-      wordsHistory: room.wordsHistory
+      wordsHistory: room.wordsHistory,
+      players: getRoomPlayers(room)
     });
   }
 
@@ -311,11 +330,15 @@ function startWorker() {
     socket.on('join_room', (data) => {
       try {
         if (!data || typeof data !== 'object') return;
-        let { roomId, playerId, roundsMode, totalRounds } = data;
+        let { roomId, playerId, playerName, roundsMode, totalRounds } = data;
         if (!roomId || !playerId || typeof roomId !== 'string' || typeof playerId !== 'string') return;
 
         roomId = roomId.trim().toUpperCase();
         if (roomId.length !== 5 || !/^[A-Z0-9]{5}$/.test(roomId)) return;
+
+        const cleanPlayerName = (typeof playerName === 'string' && playerName.trim())
+          ? playerName.trim().slice(0, 15)
+          : null;
 
         currentRoomId = roomId;
         currentPlayerId = playerId;
@@ -377,6 +400,9 @@ function startWorker() {
         // Case 1: Reconnecting existing player
         if (existingPlayer) {
           existingPlayer.socketId = socket.id;
+          if (cleanPlayerName) {
+            existingPlayer.name = cleanPlayerName;
+          }
           socket.join(roomId);
 
           if (room.disconnectedPlayerId === playerId) {
@@ -393,6 +419,7 @@ function startWorker() {
 
           socket.emit('game_state_sync', {
             playerNum: existingPlayer.playerNum,
+            playerName: existingPlayer.name,
             roomId: room.id,
             roundsMode: room.roundsMode,
             totalRounds: room.totalRounds,
@@ -406,7 +433,8 @@ function startWorker() {
             secretWord: (room.status === 'round_ended' || room.status === 'duel_ended') ? room.secretWord : null,
             startTime: room.startTime,
             wordsHistory: room.wordsHistory,
-            nextRoundRequested: existingPlayer.nextRoundRequested
+            nextRoundRequested: existingPlayer.nextRoundRequested,
+            players: getRoomPlayers(room)
           });
           return;
         }
@@ -423,6 +451,7 @@ function startWorker() {
           id: playerId,
           socketId: socket.id,
           playerNum,
+          name: cleanPlayerName || `Player ${playerNum}`,
           guesses: [],
           won: false,
           finished: false,
@@ -437,7 +466,9 @@ function startWorker() {
             roomId: room.id,
             status: 'waiting',
             roundsMode: room.roundsMode,
-            totalRounds: room.totalRounds
+            totalRounds: room.totalRounds,
+            playerName: room.players[playerId].name,
+            players: getRoomPlayers(room)
           });
         } else {
           // Player 2 joined: Start round 1!
@@ -445,7 +476,8 @@ function startWorker() {
           if (p1) {
             io.to(p1.socketId).emit('opponent_joined', {
               roundsMode: room.roundsMode,
-              totalRounds: room.totalRounds
+              totalRounds: room.totalRounds,
+              players: getRoomPlayers(room)
             });
           }
 
@@ -454,7 +486,9 @@ function startWorker() {
             roomId: room.id,
             status: 'starting',
             roundsMode: room.roundsMode,
-            totalRounds: room.totalRounds
+            totalRounds: room.totalRounds,
+            playerName: room.players[playerId].name,
+            players: getRoomPlayers(room)
           });
 
           startNextRound(room);
@@ -545,20 +579,28 @@ function startWorker() {
 
           const isLastRound = (room.roundsMode === 'fixed' && room.currentRound >= room.totalRounds);
 
+          const winnerObj = roundWinnerNum ? Object.values(room.players).find(p => p.playerNum === roundWinnerNum) : null;
+          const winnerName = winnerObj ? winnerObj.name : null;
+          const displayReason = isWinner
+            ? `${player.name || ('Player ' + player.playerNum)} found the secret word!`
+            : reason;
+
           io.to(roomId).emit('round_over', {
             currentRound: room.currentRound,
             totalRounds: room.totalRounds,
             roundsMode: room.roundsMode,
             winnerPlayerNum: roundWinnerNum,
+            winnerName,
             isDraw,
             secretWord: room.secretWord,
-            reason,
+            reason: displayReason,
             scores: {
               player1: room.scores[1] || 0,
               player2: room.scores[2] || 0
             },
             isDuelOver: isLastRound,
-            wordsHistory: room.wordsHistory
+            wordsHistory: room.wordsHistory,
+            players: getRoomPlayers(room)
           });
 
           if (isLastRound) {
@@ -569,7 +611,7 @@ function startWorker() {
         }
 
         if (isWinner) {
-          handleRoundFinish(player.playerNum, false, `Player ${player.playerNum} found the secret word!`);
+          handleRoundFinish(player.playerNum, false, `${player.name || ('Player ' + player.playerNum)} found the secret word!`);
         } else if (player.finished) {
           if (opponent && opponent.finished && !opponent.won) {
             // Both used 6 guesses without winning: Round Draw
