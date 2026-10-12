@@ -27,7 +27,7 @@
        crossorigin="anonymous"></script>
   -->
 
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=6">
 </head>
 <body>
   <!-- Toast Feedback Alerts -->
@@ -98,7 +98,7 @@
               <span>YOUR DISPLAY NAME</span>
             </div>
             <div class="player-name-input-row">
-              <input type="text" id="player-name-input" class="player-name-field" maxlength="15" placeholder="Enter your name..." value="Player 1" autocomplete="off" spellcheck="false" />
+              <input type="text" id="player-name-input" class="player-name-field" maxlength="15" placeholder="Enter nickname..." autocomplete="off" spellcheck="false" />
               <button type="button" id="random-name-btn" class="random-name-btn" title="Random nickname">
                 <span class="material-symbols-rounded">casino</span>
               </button>
@@ -625,7 +625,7 @@
   <!-- Socket.io local client script -->
   <script src="/socket.io/socket.io.js"></script>
   <!-- Main Game Client Script -->
-  <script src="/game.js"></script>
+  <script src="/game.js?v=6"></script>
 
   <!-- PWA Service Worker Registration -->
   <script>

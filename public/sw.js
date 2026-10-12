@@ -1,9 +1,9 @@
 // public/sw.js - Service Worker for WORDDUEL PWA and Android Offline Support
-const CACHE_NAME = 'wordduel-v4';
+const CACHE_NAME = 'wordduel-v6';
 const STATIC_ASSETS = [
   '/',
-  '/style.css',
-  '/game.js',
+  '/style.css?v=6',
+  '/game.js?v=6',
   '/words.json',
   '/icon.svg',
   '/manifest.json'
@@ -30,21 +30,48 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests that are not socket.io or room paths
+  // Only handle GET requests and ignore WebSocket / Socket.io
   if (event.request.method !== 'GET' || event.request.url.includes('/socket.io/')) {
     return;
   }
 
+  // Network-First for HTML navigation and JS/CSS assets so updates reflect immediately
+  const isCodeAsset = event.request.mode === 'navigate' ||
+                      event.request.url.includes('/style.css') ||
+                      event.request.url.includes('/game.js');
+
+  if (isCodeAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            if (event.request.mode === 'navigate') return caches.match('/');
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-First for static immutable assets (words.json, icons)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).catch(() => {
-        // Fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
+        return networkResponse;
       });
     })
   );
