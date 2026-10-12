@@ -886,6 +886,15 @@ html, body {
   font-size: 0.72rem;
 }
 
+/* Mobile Board Switcher Tabs (Desktop: hidden) */
+.mobile-board-tabs {
+  display: none;
+}
+
+.mobile-back-board-btn {
+  display: none;
+}
+
 /* Arena Layout: Side-by-Side (Desktop 16:9 friendly) */
 .duel-arena-layout {
   display: flex;
@@ -1417,11 +1426,17 @@ html, body {
     -webkit-text-size-adjust: 100%;
   }
 
+  /* 1. Remove Room ID pill from the header on mobile */
+  #header-room-pill {
+    display: none !important;
+  }
+
+  /* 2. Full-sized comfortable Wordle tile sizing on mobile (Single-Board Focus) */
   :root {
-    --tile-size: clamp(30px, 8.2vw, 42px);
-    --tile-gap: 3px;
-    --mini-tile-size: clamp(11px, 3vw, 16px);
-    --mini-tile-gap: 2px;
+    --tile-size: clamp(42px, 11vw, 54px);
+    --tile-gap: clamp(4px, 1.2vw, 6px);
+    --mini-tile-size: clamp(14px, 3.8vw, 20px);
+    --mini-tile-gap: 3px;
     --key-height: clamp(38px, 5.2vh, 46px);
   }
 
@@ -1437,7 +1452,7 @@ html, body {
   }
 
   .logo {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
   }
 
   .main-content {
@@ -1445,7 +1460,7 @@ html, body {
   }
 
   .duel-scoreboard {
-    padding: 5px 10px;
+    padding: 5px 12px;
     margin-bottom: 4px;
   }
 
@@ -1459,55 +1474,168 @@ html, body {
     display: none;
   }
 
+  /* 3. Mobile Board Switcher Tabs */
+  .mobile-board-tabs {
+    display: flex;
+    align-items: center;
+    background: #0f121e;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    padding: 3px;
+    margin: 0 auto 6px auto;
+    width: 100%;
+    max-width: 320px;
+    gap: 4px;
+    box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .mobile-tab-btn {
+    flex: 1;
+    border-radius: var(--radius-full);
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-family: inherit;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .mobile-tab-btn .tab-icon {
+    font-size: 1.05rem;
+    pointer-events: none;
+  }
+
+  .mobile-tab-btn .pulsing-dot-sm {
+    width: 7px;
+    height: 7px;
+    background: var(--color-correct);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 6px var(--color-correct);
+  }
+
+  .mobile-tab-btn .tab-chip {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+  }
+
+  .mobile-tab-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.5);
+  }
+
+  .mobile-tab-btn.active .tab-chip {
+    background: rgba(0, 0, 0, 0.3);
+    color: #ffffff;
+  }
+
+  /* 4. Single-Board Focus on Mobile */
   .duel-arena-layout {
-    gap: clamp(6px, 1.8vw, 12px);
-    margin-bottom: 4px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
     max-width: 100%;
-    overflow: visible;
+    margin-bottom: 4px;
+    gap: 0;
   }
 
-  .main-board-wrapper {
-    padding: 0;
+  /* Normally show YOUR BOARD */
+  .duel-arena-layout .main-board-wrapper {
+    display: flex !important;
+    width: 100%;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .duel-arena-layout .opp-board-wrapper {
+    display: none !important;
+  }
+
+  /* When Opponent tab is selected on mobile */
+  .duel-arena-layout.show-opp-tab .main-board-wrapper {
+    display: none !important;
+  }
+
+  .duel-arena-layout.show-opp-tab .opp-board-wrapper {
+    display: flex !important;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  .duel-arena-layout.show-opp-tab .opponent-grid {
+    grid-gap: 5px;
+    margin: 8px 0;
+  }
+
+  .duel-arena-layout.show-opp-tab .mini-tile {
+    width: clamp(26px, 7vw, 36px) !important;
+    height: clamp(26px, 7vw, 36px) !important;
+    border-radius: 6px;
+  }
+
+  .mobile-back-board-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    background: #272c47;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #ffffff;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.15s;
+  }
+
+  .mobile-back-board-btn:active {
+    background: var(--primary);
   }
 
   .board-heading {
-    font-size: 0.72rem;
+    font-size: 0.78rem;
   }
 
   .guess-phase-tag {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
   }
 
-  .opp-board-wrapper {
-    padding: 5px 6px;
-    border-radius: var(--radius-md);
-    flex-shrink: 0;
-  }
-
-  .opp-board-wrapper .board-header-row {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    margin-bottom: 3px;
-    padding: 0;
-  }
-
-  .opp-board-wrapper .board-heading {
-    font-size: 0.68rem;
-    max-width: 95px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: center;
-  }
-
-  .opp-board-wrapper .opp-guess-tag {
-    font-size: 0.62rem;
-    text-align: center;
+  .tile {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    font-size: clamp(1.4rem, 4.2vw, 1.85rem);
+    border-radius: 8px;
+    border-width: 2px;
   }
 
   .desktop-legend, .desktop-only {
@@ -1552,11 +1680,9 @@ html, body {
 /* Height-adaptive layout for mobile viewports (guarantees 100% keyboard visibility) */
 @media (max-height: 780px) {
   :root {
-    --tile-size: clamp(28px, 5.6vh, 38px);
-    --tile-gap: 2px;
-    --mini-tile-size: clamp(10px, 2.2vh, 14px);
-    --mini-tile-gap: 2px;
-    --key-height: clamp(34px, 4.8vh, 42px);
+    --tile-size: clamp(32px, 5.8vh, 42px);
+    --tile-gap: 3px;
+    --key-height: clamp(36px, 4.8vh, 44px);
   }
 
   .app-header {
@@ -1566,22 +1692,31 @@ html, body {
 
   .duel-scoreboard {
     padding: 4px 8px;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
 
   .opponent-live-strip {
     display: none; /* Hide strip on screens <= 780px height so full keyboard is 100% visible */
   }
 
-  .input-guidance-line {
+  .mobile-board-tabs {
     margin-bottom: 3px;
+    padding: 2px;
+  }
+
+  .mobile-tab-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .input-guidance-line {
+    margin-bottom: 2px;
     min-height: 14px;
     font-size: 0.68rem;
   }
 
   .duel-arena-layout {
-    margin-bottom: 3px;
-    gap: 6px;
+    margin-bottom: 2px;
   }
 
   .ad-slot-arena, .arena-footer-bar {

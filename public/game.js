@@ -99,6 +99,42 @@
   const opponentBoard = document.getElementById('opponent-board');
   const keyboard = document.getElementById('keyboard');
 
+  // Mobile Board Switcher Tab Elements
+  const duelArenaLayout = document.getElementById('duel-arena-layout');
+  const tabMyBoard = document.getElementById('tab-my-board');
+  const tabOppBoard = document.getElementById('tab-opp-board');
+  const mobileTabMyLabel = document.getElementById('mobile-tab-my-label');
+  const mobileTabMyChip = document.getElementById('mobile-tab-my-chip');
+  const mobileTabOppLabel = document.getElementById('mobile-tab-opp-label');
+  const mobileTabOppChip = document.getElementById('mobile-tab-opp-chip');
+  const mobileBackToMyBoardBtn = document.getElementById('mobile-back-to-my-board-btn');
+
+  let activeMobileTab = 'my';
+
+  function setMobileBoardTab(tab) {
+    activeMobileTab = tab;
+    if (tab === 'opp') {
+      if (duelArenaLayout) duelArenaLayout.classList.add('show-opp-tab');
+      if (tabMyBoard) tabMyBoard.classList.remove('active');
+      if (tabOppBoard) tabOppBoard.classList.add('active');
+    } else {
+      if (duelArenaLayout) duelArenaLayout.classList.remove('show-opp-tab');
+      if (tabMyBoard) tabMyBoard.classList.add('active');
+      if (tabOppBoard) tabOppBoard.classList.remove('active');
+    }
+  }
+
+  function updateMobileTabCounters() {
+    if (mobileTabMyChip) mobileTabMyChip.textContent = `${currentRow}/6`;
+    if (mobileTabOppChip) mobileTabOppChip.textContent = `${opponentRowCount}/6`;
+    if (mobileTabMyLabel) mobileTabMyLabel.textContent = 'Your Board';
+    if (mobileTabOppLabel) mobileTabOppLabel.textContent = oppPlayerName || 'Opponent';
+  }
+
+  if (tabMyBoard) tabMyBoard.addEventListener('click', () => setMobileBoardTab('my'));
+  if (tabOppBoard) tabOppBoard.addEventListener('click', () => setMobileBoardTab('opp'));
+  if (mobileBackToMyBoardBtn) mobileBackToMyBoardBtn.addEventListener('click', () => setMobileBoardTab('my'));
+
   // Player Display Name Elements
   const playerNameInput = document.getElementById('player-name-input');
   const randomNameBtn = document.getElementById('random-name-btn');
@@ -157,6 +193,7 @@
     if (roundOppNameLabel) roundOppNameLabel.textContent = oppPlayerName;
     if (duelFinalMyLabel) duelFinalMyLabel.textContent = myPlayerName;
     if (duelFinalOppLabel) duelFinalOppLabel.textContent = oppPlayerName;
+    updateMobileTabCounters();
   }
 
   function updatePlayersFromData(data) {
@@ -421,6 +458,8 @@
 
     updateRoundAndScoreDisplay();
     initBoards();
+    setMobileBoardTab('my');
+    updateMobileTabCounters();
 
     // Reset keyboard key states
     for (const k in letterStatuses) delete letterStatuses[k];
@@ -452,6 +491,9 @@
 
   // --- Input & Keyboard Controls ---
   function handleInput(key) {
+    if (activeMobileTab === 'opp') {
+      setMobileBoardTab('my');
+    }
     if (isLocked || gameStatus !== 'playing') return;
 
     if (key === 'ENTER') {
@@ -697,6 +739,7 @@
 
     oppGuessesCount.textContent = `${opponentRowCount} / 6 guesses`;
     oppTagCount.textContent = `${opponentRowCount} / 6 guesses`;
+    updateMobileTabCounters();
 
     let botGuessWord = localWords.answers[Math.floor(Math.random() * localWords.answers.length)] || 'slate';
     if (row >= 4 && Math.random() > 0.45) {
@@ -1240,6 +1283,7 @@
       currentGuess = '';
       myGuessesCount.textContent = `${currentRow} / 6 guesses`;
       currentGuessPhase.textContent = `Guess ${Math.min(6, currentRow + 1)} of 6`;
+      updateMobileTabCounters();
 
       if (currentRow < 6 && gameStatus === 'playing') {
         isLocked = false;
@@ -1254,6 +1298,7 @@
     oppGuessesCount.textContent = `${opponentRowCount} / 6 guesses`;
     oppTagCount.textContent = `${opponentRowCount} / 6 guesses`;
     oppActionMsg.textContent = `${oppPlayerName} submitted guess ${opponentRowCount}/6!`;
+    updateMobileTabCounters();
 
     for (let c = 0; c < 5; c++) {
       const mt = document.getElementById(`opp-tile-${row}-${c}`);

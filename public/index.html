@@ -27,7 +27,7 @@
        crossorigin="anonymous"></script>
   -->
 
-  <link rel="stylesheet" href="/style.css?v=6">
+  <link rel="stylesheet" href="/style.css?v=7">
 </head>
 <body>
   <!-- Toast Feedback Alerts -->
@@ -280,8 +280,22 @@
           <span class="strip-motto">Their colors. Never their letters.</span>
         </div>
 
-        <!-- Duel Play Area (16:9 Desktop Friendly + Mobile Stacked) -->
-        <div class="duel-arena-layout">
+        <!-- Mobile Board Switcher Tabs (Only displayed on mobile devices) -->
+        <div class="mobile-board-tabs" id="mobile-board-tabs">
+          <button type="button" class="mobile-tab-btn active" id="tab-my-board" data-tab="my">
+            <span class="material-symbols-rounded tab-icon">grid_on</span>
+            <span class="tab-label" id="mobile-tab-my-label">Your Board</span>
+            <span class="tab-chip" id="mobile-tab-my-chip">0/6</span>
+          </button>
+          <button type="button" class="mobile-tab-btn" id="tab-opp-board" data-tab="opp">
+            <span class="pulsing-dot-sm"></span>
+            <span class="tab-label" id="mobile-tab-opp-label">Opponent</span>
+            <span class="tab-chip" id="mobile-tab-opp-chip">0/6</span>
+          </button>
+        </div>
+
+        <!-- Duel Play Area (16:9 Desktop Friendly + Mobile Single-Board Focus) -->
+        <div class="duel-arena-layout" id="duel-arena-layout">
           
           <!-- Primary Board: YOU -->
           <div class="board-wrapper main-board-wrapper">
@@ -305,6 +319,10 @@
             <div class="grid-board opponent-grid" id="opponent-board">
               <!-- 6 rows x 5 color-only mini tiles -->
             </div>
+
+            <button type="button" id="mobile-back-to-my-board-btn" class="mobile-back-board-btn">
+              <span class="material-symbols-rounded">arrow_back</span> Back to Your Board
+            </button>
 
             <div class="desktop-legend">
               <span class="legend-title">Read the colors. Find the word.</span>
@@ -625,7 +643,7 @@
   <!-- Socket.io local client script -->
   <script src="/socket.io/socket.io.js"></script>
   <!-- Main Game Client Script -->
-  <script src="/game.js?v=6"></script>
+  <script src="/game.js?v=7"></script>
 
   <!-- PWA Service Worker Registration -->
   <script>
