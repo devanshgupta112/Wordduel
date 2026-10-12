@@ -305,363 +305,411 @@ function startWorker() {
   io.on('connection', (socket) => {
     let currentRoomId = null;
     let currentPlayerId = null;
+    let roomsCreatedCount = 0;
 
     // Join / Create Room
-    socket.on('join_room', ({ roomId, playerId, roundsMode, totalRounds }) => {
-      if (!roomId || !playerId) return;
+    socket.on('join_room', (data) => {
+      try {
+        if (!data || typeof data !== 'object') return;
+        let { roomId, playerId, roundsMode, totalRounds } = data;
+        if (!roomId || !playerId || typeof roomId !== 'string' || typeof playerId !== 'string') return;
 
-      roomId = roomId.trim().toUpperCase();
-      currentRoomId = roomId;
-      currentPlayerId = playerId;
+        roomId = roomId.trim().toUpperCase();
+        if (roomId.length !== 5 || !/^[A-Z0-9]{5}$/.test(roomId)) return;
 
-      let room = rooms.get(roomId);
+        currentRoomId = roomId;
+        currentPlayerId = playerId;
 
-      if (!room) {
-        // Validate rounds settings
-        let validMode = 'fixed';
-        let validTotal = 3;
+        let room = rooms.get(roomId);
 
-        if (roundsMode === 'unlimited') {
-          validMode = 'unlimited';
-          validTotal = null;
-        } else {
-          validMode = 'fixed';
-          const parsed = parseInt(totalRounds, 10);
-          if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
-            validTotal = parsed;
-          } else {
-            validTotal = 3;
+        if (!room) {
+          // Prevent a single socket from spamming hundreds of ghost rooms
+          if (roomsCreatedCount >= 10) {
+            socket.emit('room_creation_limit', { message: 'Room creation limit reached for this connection' });
+            return;
           }
+          roomsCreatedCount++;
+
+          // Validate rounds settings
+          let validMode = 'fixed';
+          let validTotal = 3;
+
+          if (roundsMode === 'unlimited') {
+            validMode = 'unlimited';
+            validTotal = null;
+          } else {
+            validMode = 'fixed';
+            const parsed = parseInt(totalRounds, 10);
+            if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) {
+              validTotal = parsed;
+            } else {
+              validTotal = 3;
+            }
+          }
+
+          room = {
+            id: roomId,
+            roundsMode: validMode,
+            totalRounds: validTotal,
+            currentRound: 0,
+            secretWord: '',
+            usedWords: [],
+            wordsHistory: [], // { round: number, word: string, winnerPlayerNum: number | null, isDraw: boolean }
+            scores: { 1: 0, 2: 0 },
+            status: 'waiting', // 'waiting' | 'countdown' | 'playing' | 'round_ended' | 'duel_ended'
+            players: {},
+            roundWinnerPlayerNum: null,
+            roundIsDraw: false,
+            startTime: null,
+            lastActive: Date.now(),
+            disconnectTimer: null,
+            disconnectedPlayerId: null,
+            countdownTimer: null
+          };
+          rooms.set(roomId, room);
+        } else {
+          room.lastActive = Date.now();
         }
 
-        room = {
-          id: roomId,
-          roundsMode: validMode,
-          totalRounds: validTotal,
-          currentRound: 0,
-          secretWord: '',
-          usedWords: [],
-          wordsHistory: [], // { round: number, word: string, winnerPlayerNum: number | null, isDraw: boolean }
-          scores: { 1: 0, 2: 0 },
-          status: 'waiting', // 'waiting' | 'countdown' | 'playing' | 'round_ended' | 'duel_ended'
-          players: {},
-          roundWinnerPlayerNum: null,
-          roundIsDraw: false,
-          startTime: null,
-          lastActive: Date.now(),
-          disconnectTimer: null,
-          disconnectedPlayerId: null,
-          countdownTimer: null
+        const playerIds = Object.keys(room.players);
+        const existingPlayer = room.players[playerId];
+
+        // Case 1: Reconnecting existing player
+        if (existingPlayer) {
+          existingPlayer.socketId = socket.id;
+          socket.join(roomId);
+
+          if (room.disconnectedPlayerId === playerId) {
+            if (room.disconnectTimer) {
+              clearTimeout(room.disconnectTimer);
+              room.disconnectTimer = null;
+            }
+            room.disconnectedPlayerId = null;
+            socket.to(roomId).emit('opponent_reconnected');
+          }
+
+          const opponentId = playerIds.find(id => id !== playerId);
+          const opponent = opponentId ? room.players[opponentId] : null;
+
+          socket.emit('game_state_sync', {
+            playerNum: existingPlayer.playerNum,
+            roomId: room.id,
+            roundsMode: room.roundsMode,
+            totalRounds: room.totalRounds,
+            currentRound: room.currentRound,
+            status: room.status,
+            scores: room.scores,
+            myGuesses: existingPlayer.guesses,
+            opponentGuesses: opponent ? opponent.guesses.map(g => ({ evaluation: g.evaluation })) : [],
+            opponentConnected: !!opponent,
+            roundWinnerPlayerNum: room.roundWinnerPlayerNum,
+            secretWord: (room.status === 'round_ended' || room.status === 'duel_ended') ? room.secretWord : null,
+            startTime: room.startTime,
+            wordsHistory: room.wordsHistory,
+            nextRoundRequested: existingPlayer.nextRoundRequested
+          });
+          return;
+        }
+
+        // Case 2: Room is already full (2 players already registered)
+        if (playerIds.length >= 2) {
+          socket.emit('room_full', { roomId });
+          return;
+        }
+
+        // Case 3: New player joining slot
+        const playerNum = playerIds.length === 0 ? 1 : 2;
+        room.players[playerId] = {
+          id: playerId,
+          socketId: socket.id,
+          playerNum,
+          guesses: [],
+          won: false,
+          finished: false,
+          nextRoundRequested: false
         };
-        rooms.set(roomId, room);
-      } else {
-        room.lastActive = Date.now();
-      }
 
-      const playerIds = Object.keys(room.players);
-      const existingPlayer = room.players[playerId];
-
-      // Case 1: Reconnecting existing player
-      if (existingPlayer) {
-        existingPlayer.socketId = socket.id;
         socket.join(roomId);
 
-        if (room.disconnectedPlayerId === playerId) {
-          if (room.disconnectTimer) {
-            clearTimeout(room.disconnectTimer);
-            room.disconnectTimer = null;
-          }
-          room.disconnectedPlayerId = null;
-          socket.to(roomId).emit('opponent_reconnected');
-        }
-
-        const opponentId = playerIds.find(id => id !== playerId);
-        const opponent = opponentId ? room.players[opponentId] : null;
-
-        socket.emit('game_state_sync', {
-          playerNum: existingPlayer.playerNum,
-          roomId: room.id,
-          roundsMode: room.roundsMode,
-          totalRounds: room.totalRounds,
-          currentRound: room.currentRound,
-          status: room.status,
-          scores: room.scores,
-          myGuesses: existingPlayer.guesses,
-          opponentGuesses: opponent ? opponent.guesses.map(g => ({ evaluation: g.evaluation })) : [],
-          opponentConnected: !!opponent,
-          roundWinnerPlayerNum: room.roundWinnerPlayerNum,
-          secretWord: (room.status === 'round_ended' || room.status === 'duel_ended') ? room.secretWord : null,
-          startTime: room.startTime,
-          wordsHistory: room.wordsHistory,
-          nextRoundRequested: existingPlayer.nextRoundRequested
-        });
-        return;
-      }
-
-      // Case 2: Room is already full (2 players already registered)
-      if (playerIds.length >= 2) {
-        socket.emit('room_full', { roomId });
-        return;
-      }
-
-      // Case 3: New player joining slot
-      const playerNum = playerIds.length === 0 ? 1 : 2;
-      room.players[playerId] = {
-        id: playerId,
-        socketId: socket.id,
-        playerNum,
-        guesses: [],
-        won: false,
-        finished: false,
-        nextRoundRequested: false
-      };
-
-      socket.join(roomId);
-
-      if (playerNum === 1) {
-        socket.emit('room_joined', {
-          playerNum: 1,
-          roomId: room.id,
-          status: 'waiting',
-          roundsMode: room.roundsMode,
-          totalRounds: room.totalRounds
-        });
-      } else {
-        // Player 2 joined: Start round 1!
-        const p1 = Object.values(room.players).find(p => p.playerNum === 1);
-        if (p1) {
-          io.to(p1.socketId).emit('opponent_joined', {
+        if (playerNum === 1) {
+          socket.emit('room_joined', {
+            playerNum: 1,
+            roomId: room.id,
+            status: 'waiting',
             roundsMode: room.roundsMode,
             totalRounds: room.totalRounds
           });
+        } else {
+          // Player 2 joined: Start round 1!
+          const p1 = Object.values(room.players).find(p => p.playerNum === 1);
+          if (p1) {
+            io.to(p1.socketId).emit('opponent_joined', {
+              roundsMode: room.roundsMode,
+              totalRounds: room.totalRounds
+            });
+          }
+
+          socket.emit('room_joined', {
+            playerNum: 2,
+            roomId: room.id,
+            status: 'starting',
+            roundsMode: room.roundsMode,
+            totalRounds: room.totalRounds
+          });
+
+          startNextRound(room);
         }
-
-        socket.emit('room_joined', {
-          playerNum: 2,
-          roomId: room.id,
-          status: 'starting',
-          roundsMode: room.roundsMode,
-          totalRounds: room.totalRounds
-        });
-
-        startNextRound(room);
+      } catch (err) {
+        console.error('Error handling join_room:', err);
       }
     });
 
     // Submit Guess
-    socket.on('submit_guess', ({ roomId, playerId, guess }) => {
-      if (!roomId || !playerId || !guess) return;
+    socket.on('submit_guess', (data) => {
+      try {
+        if (!data || typeof data !== 'object') return;
+        let { roomId, playerId, guess } = data;
+        if (!roomId || !playerId || !guess || typeof roomId !== 'string' || typeof playerId !== 'string' || typeof guess !== 'string') return;
 
-      roomId = roomId.trim().toUpperCase();
-      const room = rooms.get(roomId);
-      if (!room || room.status !== 'playing') return;
+        roomId = roomId.trim().toUpperCase();
+        const room = rooms.get(roomId);
+        if (!room || room.status !== 'playing') return;
 
-      const player = room.players[playerId];
-      if (!player || player.finished) return;
+        const player = room.players[playerId];
+        // Enforce that player exists, isn't finished, and this socket is the registered owner of this player slot
+        if (!player || player.finished || player.socketId !== socket.id) return;
 
-      room.lastActive = Date.now();
-      const cleanGuess = guess.trim().toLowerCase();
+        room.lastActive = Date.now();
+        const cleanGuess = guess.trim().toLowerCase();
 
-      // Validate 5 letters
-      if (cleanGuess.length !== 5 || !/^[a-z]{5}$/.test(cleanGuess)) {
-        socket.emit('guess_error', { message: 'Must be 5 letters' });
-        return;
-      }
-
-      // Validate against local dictionary
-      if (!allowedSet.has(cleanGuess)) {
-        socket.emit('guess_error', { message: 'Not in word list' });
-        return;
-      }
-
-      // Server-authoritative evaluation
-      const evaluation = evaluateWordleGuess(cleanGuess, room.secretWord);
-      player.guesses.push({
-        word: cleanGuess,
-        evaluation
-      });
-
-      const isWinner = evaluation.every(c => c === 'green');
-      if (isWinner) {
-        player.won = true;
-        player.finished = true;
-      } else if (player.guesses.length >= 6) {
-        player.finished = true;
-      }
-
-      const rowIndex = player.guesses.length - 1;
-
-      // Send letters and colors to the player
-      socket.emit('guess_result', {
-        guess: cleanGuess,
-        evaluation,
-        row: rowIndex
-      });
-
-      // Send ONLY colors (no letters) to the opponent
-      socket.to(roomId).emit('opponent_guess_result', {
-        evaluation,
-        row: rowIndex
-      });
-
-      // Round Win / Draw Checks
-      const opponent = Object.values(room.players).find(p => p.id !== playerId);
-
-      function handleRoundFinish(roundWinnerNum, isDraw, reason) {
-        room.status = 'round_ended';
-        room.roundWinnerPlayerNum = roundWinnerNum;
-        room.roundIsDraw = isDraw;
-
-        if (roundWinnerNum) {
-          room.scores[roundWinnerNum] = (room.scores[roundWinnerNum] || 0) + 1;
+        // Validate 5 letters
+        if (cleanGuess.length !== 5 || !/^[a-z]{5}$/.test(cleanGuess)) {
+          socket.emit('guess_error', { message: 'Must be 5 letters' });
+          return;
         }
 
-        room.wordsHistory.push({
-          round: room.currentRound,
-          word: room.secretWord,
-          winnerPlayerNum: roundWinnerNum,
-          isDraw
-        });
-
-        const isLastRound = (room.roundsMode === 'fixed' && room.currentRound >= room.totalRounds);
-
-        io.to(roomId).emit('round_over', {
-          currentRound: room.currentRound,
-          totalRounds: room.totalRounds,
-          roundsMode: room.roundsMode,
-          winnerPlayerNum: roundWinnerNum,
-          isDraw,
-          secretWord: room.secretWord,
-          reason,
-          scores: {
-            player1: room.scores[1] || 0,
-            player2: room.scores[2] || 0
-          },
-          isDuelOver: isLastRound,
-          wordsHistory: room.wordsHistory
-        });
-
-        if (isLastRound) {
-          setTimeout(() => {
-            endDuel(room, 'All rounds completed!');
-          }, 1500);
+        // Validate against local dictionary
+        if (!allowedSet.has(cleanGuess)) {
+          socket.emit('guess_error', { message: 'Not in word list' });
+          return;
         }
-      }
 
-      if (isWinner) {
-        handleRoundFinish(player.playerNum, false, `Player ${player.playerNum} found the secret word!`);
-      } else if (player.finished) {
-        if (opponent && opponent.finished && !opponent.won) {
-          // Both used 6 guesses without winning: Round Draw
-          handleRoundFinish(null, true, 'Both players used all 6 guesses.');
-        } else {
-          socket.emit('player_finished_round', {
-            message: "You've used all 6 guesses. Waiting for opponent..."
+        // Server-authoritative evaluation
+        const evaluation = evaluateWordleGuess(cleanGuess, room.secretWord);
+        player.guesses.push({
+          word: cleanGuess,
+          evaluation
+        });
+
+        const isWinner = evaluation.every(c => c === 'green');
+        if (isWinner) {
+          player.won = true;
+          player.finished = true;
+        } else if (player.guesses.length >= 6) {
+          player.finished = true;
+        }
+
+        const rowIndex = player.guesses.length - 1;
+
+        // Send letters and colors to the player
+        socket.emit('guess_result', {
+          guess: cleanGuess,
+          evaluation,
+          row: rowIndex
+        });
+
+        // Send ONLY colors (no letters) to the opponent
+        socket.to(roomId).emit('opponent_guess_result', {
+          evaluation,
+          row: rowIndex
+        });
+
+        // Round Win / Draw Checks
+        const opponent = Object.values(room.players).find(p => p.id !== playerId);
+
+        function handleRoundFinish(roundWinnerNum, isDraw, reason) {
+          room.status = 'round_ended';
+          room.roundWinnerPlayerNum = roundWinnerNum;
+          room.roundIsDraw = isDraw;
+
+          if (roundWinnerNum) {
+            room.scores[roundWinnerNum] = (room.scores[roundWinnerNum] || 0) + 1;
+          }
+
+          room.wordsHistory.push({
+            round: room.currentRound,
+            word: room.secretWord,
+            winnerPlayerNum: roundWinnerNum,
+            isDraw
           });
+
+          const isLastRound = (room.roundsMode === 'fixed' && room.currentRound >= room.totalRounds);
+
+          io.to(roomId).emit('round_over', {
+            currentRound: room.currentRound,
+            totalRounds: room.totalRounds,
+            roundsMode: room.roundsMode,
+            winnerPlayerNum: roundWinnerNum,
+            isDraw,
+            secretWord: room.secretWord,
+            reason,
+            scores: {
+              player1: room.scores[1] || 0,
+              player2: room.scores[2] || 0
+            },
+            isDuelOver: isLastRound,
+            wordsHistory: room.wordsHistory
+          });
+
+          if (isLastRound) {
+            setTimeout(() => {
+              endDuel(room, 'All rounds completed!');
+            }, 1500);
+          }
         }
+
+        if (isWinner) {
+          handleRoundFinish(player.playerNum, false, `Player ${player.playerNum} found the secret word!`);
+        } else if (player.finished) {
+          if (opponent && opponent.finished && !opponent.won) {
+            // Both used 6 guesses without winning: Round Draw
+            handleRoundFinish(null, true, 'Both players used all 6 guesses.');
+          } else {
+            socket.emit('player_finished_round', {
+              message: "You've used all 6 guesses. Waiting for opponent..."
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error handling submit_guess:', err);
       }
     });
 
     // Next Round Request (Unlimited or rematch)
-    socket.on('request_next_round', ({ roomId, playerId }) => {
-      if (!roomId || !playerId) return;
+    socket.on('request_next_round', (data) => {
+      try {
+        if (!data || typeof data !== 'object') return;
+        let { roomId, playerId } = data;
+        if (!roomId || !playerId || typeof roomId !== 'string' || typeof playerId !== 'string') return;
 
-      roomId = roomId.trim().toUpperCase();
-      const room = rooms.get(roomId);
-      if (!room || room.status !== 'round_ended') return;
+        roomId = roomId.trim().toUpperCase();
+        const room = rooms.get(roomId);
+        if (!room || room.status !== 'round_ended') return;
 
-      const player = room.players[playerId];
-      if (!player) return;
+        const player = room.players[playerId];
+        if (!player || player.socketId !== socket.id) return;
 
-      room.lastActive = Date.now();
-      player.nextRoundRequested = true;
-      const allPlayers = Object.values(room.players);
-      const bothReady = allPlayers.length === 2 && allPlayers.every(p => p.nextRoundRequested);
+        room.lastActive = Date.now();
+        player.nextRoundRequested = true;
+        const allPlayers = Object.values(room.players);
+        const bothReady = allPlayers.length === 2 && allPlayers.every(p => p.nextRoundRequested);
 
-      if (bothReady) {
-        startNextRound(room);
-      } else {
-        socket.emit('next_round_status', { selfRequested: true });
-        socket.to(roomId).emit('opponent_ready_next_round');
+        if (bothReady) {
+          startNextRound(room);
+        } else {
+          socket.emit('next_round_status', { selfRequested: true });
+          socket.to(roomId).emit('opponent_ready_next_round');
+        }
+      } catch (err) {
+        console.error('Error handling request_next_round:', err);
       }
     });
 
     // End Duel manually (Unlimited mode or either player ending)
-    socket.on('end_duel', ({ roomId, playerId }) => {
-      if (!roomId || !playerId) return;
+    socket.on('end_duel', (data) => {
+      try {
+        if (!data || typeof data !== 'object') return;
+        let { roomId, playerId } = data;
+        if (!roomId || !playerId || typeof roomId !== 'string' || typeof playerId !== 'string') return;
 
-      roomId = roomId.trim().toUpperCase();
-      const room = rooms.get(roomId);
-      if (!room) return;
+        roomId = roomId.trim().toUpperCase();
+        const room = rooms.get(roomId);
+        if (!room) return;
 
-      room.lastActive = Date.now();
-      endDuel(room, `Player ended the duel.`);
+        const player = room.players[playerId];
+        if (!player || player.socketId !== socket.id) return;
+
+        room.lastActive = Date.now();
+        endDuel(room, `Player ended the duel.`);
+      } catch (err) {
+        console.error('Error handling end_duel:', err);
+      }
     });
 
     // Rematch Request for when a duel has ended completely
-    socket.on('request_rematch', ({ roomId, playerId }) => {
-      if (!roomId || !playerId) return;
+    socket.on('request_rematch', (data) => {
+      try {
+        if (!data || typeof data !== 'object') return;
+        let { roomId, playerId } = data;
+        if (!roomId || !playerId || typeof roomId !== 'string' || typeof playerId !== 'string') return;
 
-      roomId = roomId.trim().toUpperCase();
-      const room = rooms.get(roomId);
-      if (!room || (room.status !== 'duel_ended' && room.status !== 'ended')) return;
+        roomId = roomId.trim().toUpperCase();
+        const room = rooms.get(roomId);
+        if (!room || (room.status !== 'duel_ended' && room.status !== 'ended')) return;
 
-      const player = room.players[playerId];
-      if (!player) return;
+        const player = room.players[playerId];
+        if (!player || player.socketId !== socket.id) return;
 
-      room.lastActive = Date.now();
-      player.nextRoundRequested = true;
-      const allPlayers = Object.values(room.players);
-      const bothWant = allPlayers.length === 2 && allPlayers.every(p => p.nextRoundRequested);
+        room.lastActive = Date.now();
+        player.nextRoundRequested = true;
+        const allPlayers = Object.values(room.players);
+        const bothWant = allPlayers.length === 2 && allPlayers.every(p => p.nextRoundRequested);
 
-      if (bothWant) {
-        // Reset duel entirely
-        room.currentRound = 0;
-        room.scores = { 1: 0, 2: 0 };
-        room.wordsHistory = [];
-        room.usedWords = [];
-        for (const p of allPlayers) {
-          p.nextRoundRequested = false;
+        if (bothWant) {
+          // Reset duel entirely
+          room.currentRound = 0;
+          room.scores = { 1: 0, 2: 0 };
+          room.wordsHistory = [];
+          room.usedWords = [];
+          for (const p of allPlayers) {
+            p.nextRoundRequested = false;
+          }
+          startNextRound(room);
+        } else {
+          socket.emit('rematch_status', { selfRequested: true });
+          socket.to(roomId).emit('opponent_wants_rematch');
         }
-        startNextRound(room);
-      } else {
-        socket.emit('rematch_status', { selfRequested: true });
-        socket.to(roomId).emit('opponent_wants_rematch');
+      } catch (err) {
+        console.error('Error handling request_rematch:', err);
       }
     });
 
     // Disconnection Handling with 30-Second Reconnection Grace Period
     socket.on('disconnect', () => {
-      if (!currentRoomId || !currentPlayerId) return;
+      try {
+        if (!currentRoomId || !currentPlayerId) return;
 
-      const room = rooms.get(currentRoomId);
-      if (!room) return;
+        const room = rooms.get(currentRoomId);
+        if (!room) return;
 
-      const player = room.players[currentPlayerId];
-      if (!player) return;
+        const player = room.players[currentPlayerId];
+        if (!player) return;
 
-      if (room.status === 'waiting') {
-        delete room.players[currentPlayerId];
-        if (Object.keys(room.players).length === 0) {
-          rooms.delete(currentRoomId);
-        }
-        return;
-      }
-
-      if (room.status === 'playing' || room.status === 'countdown' || room.status === 'round_ended') {
-        room.disconnectedPlayerId = currentPlayerId;
-        socket.to(currentRoomId).emit('opponent_disconnected', {
-          secondsRemaining: 30
-        });
-
-        if (room.disconnectTimer) clearTimeout(room.disconnectTimer);
-
-        room.disconnectTimer = setTimeout(() => {
-          if (room.disconnectedPlayerId === currentPlayerId) {
-            // End duel and show results for rounds played
-            endDuel(room, 'Opponent disconnected and did not return. Duel ended.');
+        if (room.status === 'waiting') {
+          delete room.players[currentPlayerId];
+          if (Object.keys(room.players).length === 0) {
+            rooms.delete(currentRoomId);
           }
-        }, 30000);
+          return;
+        }
+
+        if (room.status === 'playing' || room.status === 'countdown' || room.status === 'round_ended') {
+          room.disconnectedPlayerId = currentPlayerId;
+          socket.to(currentRoomId).emit('opponent_disconnected', {
+            secondsRemaining: 30
+          });
+
+          if (room.disconnectTimer) clearTimeout(room.disconnectTimer);
+
+          room.disconnectTimer = setTimeout(() => {
+            if (room.disconnectedPlayerId === currentPlayerId) {
+              // End duel and show results for rounds played
+              endDuel(room, 'Opponent disconnected and did not return. Duel ended.');
+            }
+          }, 30000);
+        }
+      } catch (err) {
+        console.error('Error handling disconnect:', err);
       }
     });
   });
