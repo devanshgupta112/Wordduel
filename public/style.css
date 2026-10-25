@@ -895,6 +895,27 @@ html, body {
   display: none;
 }
 
+/* Solo Mode Arena Adjustments */
+body.solo-mode .opponent-live-strip,
+body.solo-mode .mobile-board-tabs,
+body.solo-mode .opp-board-wrapper {
+  display: none !important;
+}
+
+body.solo-mode .duel-arena-layout {
+  justify-content: center !important;
+  align-items: center !important;
+  margin-bottom: 8px;
+}
+
+body.solo-mode .duel-scoreboard {
+  max-width: 480px;
+}
+
+body.solo-mode .main-board-wrapper {
+  margin: 0 auto;
+}
+
 /* Arena Layout: Side-by-Side (Desktop 16:9 friendly) */
 .duel-arena-layout {
   display: flex;

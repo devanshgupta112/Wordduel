@@ -21,7 +21,7 @@
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3754820854748464"
        crossorigin="anonymous"></script>
 
-  <link rel="stylesheet" href="/style.css?v=7">
+  <link rel="stylesheet" href="/style.css?v=8">
 </head>
 <body>
   <!-- Toast Feedback Alerts -->
@@ -37,7 +37,7 @@
           <span class="material-symbols-rounded logo-icon">sports_esports</span> WORD<span>DUEL</span>
         </a>
         <span class="room-pill" id="header-room-pill" style="display: none;">
-          ROOM <strong id="header-room-code">------</strong>
+          <span id="header-room-label">ROOM</span> <strong id="header-room-code">------</strong>
         </span>
       </div>
 
@@ -109,21 +109,21 @@
             </button>
           </div>
 
-          <!-- Secondary Modes: Bot & Same Device -->
+          <!-- Secondary Modes: Solo Practice & Bot Duel -->
           <div class="secondary-modes-grid">
+            <button id="play-solo-btn" class="mode-card">
+              <div class="mode-icon"><span class="material-symbols-rounded">person</span></div>
+              <div class="mode-text">
+                <strong>Play Solo</strong>
+                <span>Just guess & solve</span>
+              </div>
+            </button>
+
             <button id="play-bot-btn" class="mode-card">
               <div class="mode-icon"><span class="material-symbols-rounded">smart_toy</span></div>
               <div class="mode-text">
                 <strong>Play vs Bot</strong>
                 <span>Sharpen your skills</span>
-              </div>
-            </button>
-
-            <button id="same-device-btn" class="mode-card">
-              <div class="mode-icon"><span class="material-symbols-rounded">devices</span></div>
-              <div class="mode-text">
-                <strong>Same Device</strong>
-                <span>Pass & play</span>
               </div>
             </button>
           </div>
@@ -616,9 +616,10 @@
       <div class="modal-sheet text-left">
         <h3 class="modal-heading">How WordDuel Works</h3>
         <ul class="rules-list">
-          <li><strong>Same Word:</strong> You and your opponent are solving the exact same secret 5-letter word in real time.</li>
-          <li><strong>Speed & Strategy:</strong> The first player to discover the word takes the crown!</li>
-          <li><strong>Live Progress:</strong> Every time your opponent submits a guess, their color pattern updates live on your screen (letters remain secret).</li>
+          <li><strong>Modes:</strong> Play Solo to guess and solve at your own pace, challenge the Bot AI, or create an online room to duel a friend!</li>
+          <li><strong>Same Word:</strong> In Duels, both players race to solve the exact same secret 5-letter word in real time.</li>
+          <li><strong>Speed & Strategy:</strong> Guess the secret 5-letter word in 6 attempts. First to discover it wins the round!</li>
+          <li><strong>Live Progress:</strong> In duels, your opponent's color pattern updates live on your screen as they make guesses (letters remain hidden).</li>
           <li><strong>Colors:</strong>
             <div class="rules-legend-list">
               <div class="legend-item"><span class="legend-dot green"></span> <strong>Green:</strong> Right letter, right spot</div>
@@ -626,7 +627,7 @@
               <div class="legend-item"><span class="legend-dot grey"></span> <strong>Grey:</strong> Letter not in the word</div>
             </div>
           </li>
-          <li><strong>Rematch:</strong> If both players click Rematch, a brand new round begins with a new secret word!</li>
+          <li><strong>Next Round / Next Word:</strong> Jump right into the next word and build your win streak!</li>
         </ul>
         <button id="close-rules-btn" class="btn btn-primary btn-glow full-width">Got it, Let's Play!</button>
       </div>
@@ -637,7 +638,7 @@
   <!-- Socket.io local client script -->
   <script src="/socket.io/socket.io.js"></script>
   <!-- Main Game Client Script -->
-  <script src="/game.js?v=7"></script>
+  <script src="/game.js?v=8"></script>
 
   <!-- PWA Service Worker Registration -->
   <script>

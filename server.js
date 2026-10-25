@@ -161,6 +161,14 @@ function startWorker() {
     res.sendFile(p);
   });
 
+  // Explicit route for ads.txt
+  app.get('/ads.txt', (req, res) => {
+    const p = fs.existsSync(path.join(__dirname, 'public', 'ads.txt'))
+      ? path.join(__dirname, 'public', 'ads.txt')
+      : path.join(__dirname, 'ads.txt');
+    res.type('text/plain').sendFile(p);
+  });
+
   // Route support
   app.get(['/', '/room/:roomId'], (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

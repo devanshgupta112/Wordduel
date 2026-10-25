@@ -50,6 +50,13 @@
   let botInterval = null;
   let botUsedWords = [];
 
+  // Solo Practice Mode State
+  let soloStreak = parseInt(localStorage.getItem('wordduel_solo_streak') || '0', 10);
+  let soloBestStreak = parseInt(localStorage.getItem('wordduel_solo_best_streak') || '0', 10);
+  let soloTotalSolved = parseInt(localStorage.getItem('wordduel_solo_solved') || '0', 10);
+  let soloUsedWords = [];
+  let soloSecretWord = '';
+
   // --- DOM Elements ---
   const toastContainer = document.getElementById('toast-container');
   const viewHome = document.getElementById('view-home');
@@ -58,6 +65,7 @@
   const viewGame = document.getElementById('view-game');
 
   const headerRoomPill = document.getElementById('header-room-pill');
+  const headerRoomLabel = document.getElementById('header-room-label');
   const headerRoomCode = document.getElementById('header-room-code');
   const headerTimerPill = document.getElementById('header-timer-pill');
   const matchTimerEl = document.getElementById('match-timer');
@@ -69,6 +77,7 @@
   // Home Screen Elements
   const createGameBtn = document.getElementById('create-game-btn');
   const openJoinModalBtn = document.getElementById('open-join-modal-btn');
+  const playSoloBtn = document.getElementById('play-solo-btn');
   const playBotBtn = document.getElementById('play-bot-btn');
   const sameDeviceBtn = document.getElementById('same-device-btn');
 
@@ -200,6 +209,14 @@
       playerNameInput.value = myPlayerName;
     }
     const displayName = myPlayerName || 'You';
+    if (gameMode === 'solo') {
+      if (myScoreLabel) myScoreLabel.textContent = `${displayName} (You)`;
+      if (oppScoreLabel) oppScoreLabel.textContent = 'Best Streak';
+      if (oppGuessesCount) oppGuessesCount.textContent = `${soloBestStreak} solved`;
+      if (duelFinalMyLabel) duelFinalMyLabel.textContent = 'Words Solved';
+      if (duelFinalOppLabel) duelFinalOppLabel.textContent = 'Best Streak';
+      return;
+    }
     if (myScoreLabel) myScoreLabel.textContent = `${displayName} (You)`;
     if (oppScoreLabel) oppScoreLabel.textContent = oppPlayerName;
     if (oppBoardHeading) oppBoardHeading.textContent = `${oppPlayerName}'s Board`;
@@ -345,6 +362,12 @@
   function switchView(viewName) {
     [viewHome, viewWaiting, viewRoomFull, viewGame].forEach(v => v.classList.remove('active'));
 
+    if (viewName === 'game' && gameMode === 'solo') {
+      document.body.classList.add('solo-mode');
+    } else {
+      document.body.classList.remove('solo-mode');
+    }
+
     if (viewName === 'home') {
       viewHome.classList.add('active');
       headerRoomPill.style.display = 'none';
@@ -353,11 +376,13 @@
     } else if (viewName === 'waiting') {
       viewWaiting.classList.add('active');
       headerRoomPill.style.display = 'flex';
+      if (headerRoomLabel) headerRoomLabel.textContent = 'ROOM';
       headerTimerPill.style.display = 'none';
       leaveRoomHeaderBtn.style.display = 'none';
     } else if (viewName === 'game') {
       viewGame.classList.add('active');
       headerRoomPill.style.display = 'flex';
+      if (headerRoomLabel) headerRoomLabel.textContent = (gameMode === 'solo') ? 'MODE' : 'ROOM';
       headerTimerPill.style.display = 'flex';
       leaveRoomHeaderBtn.style.display = 'block';
     } else if (viewName === 'room-full') {
@@ -461,6 +486,13 @@
 
   // --- Update Score and Round Pill Headers ---
   function updateRoundAndScoreDisplay() {
+    if (gameMode === 'solo') {
+      arenaRoundPill.textContent = `Word ${currentRound}`;
+      runningScoreBadge.textContent = `Streak: ${soloStreak}`;
+      if (oppScoreLabel) oppScoreLabel.textContent = 'Best Streak';
+      if (oppGuessesCount) oppGuessesCount.textContent = `${soloBestStreak} solved`;
+      return;
+    }
     if (roundsMode === 'unlimited') {
       arenaRoundPill.textContent = `Round ${currentRound}`;
       if (lobbyRoundsChip) lobbyRoundsChip.textContent = 'Unlimited';
@@ -483,12 +515,17 @@
     opponentRowCount = 0;
 
     myGuessesCount.textContent = '0 / 6 guesses';
-    oppGuessesCount.textContent = '0 / 6 guesses';
+    if (gameMode === 'solo') {
+      if (oppGuessesCount) oppGuessesCount.textContent = `${soloBestStreak} solved`;
+      if (oppScoreLabel) oppScoreLabel.textContent = 'Best Streak';
+    } else {
+      oppGuessesCount.textContent = '0 / 6 guesses';
+    }
     oppTagCount.textContent = '0 / 6 guesses';
     currentGuessPhase.textContent = 'Guess 1 of 6';
     inputGuidance.textContent = 'Five letters. Hit Enter when you\'re ready.';
     oppActionMsg.textContent = 'Ready. Set. Guess.';
-    nextRoundBtnText.textContent = 'Next Round';
+    nextRoundBtnText.textContent = (gameMode === 'solo') ? 'Next Word' : 'Next Round';
     nextRoundBtn.disabled = false;
     roundOverModal.style.display = 'none';
     duelResultsModal.style.display = 'none';
@@ -508,7 +545,11 @@
   // --- 3, 2, 1 Countdown Animation ---
   function playRoundCountdown(roundNum, onDone) {
     roundCountdownOverlay.style.display = 'flex';
-    countdownRoundLabel.textContent = `ROUND ${roundNum}`;
+    countdownRoundLabel.textContent = (gameMode === 'solo') ? `WORD ${roundNum}` : `ROUND ${roundNum}`;
+    const cdText = roundCountdownOverlay.querySelector('.countdown-text');
+    if (cdText) {
+      cdText.textContent = (gameMode === 'solo') ? 'Get ready to guess!' : 'Get ready to race!';
+    }
     let remaining = 3;
     countdownNumber.textContent = remaining;
 
@@ -596,6 +637,8 @@
       });
     } else if (gameMode === 'bot') {
       evaluateBotGameGuess(currentGuess);
+    } else if (gameMode === 'solo') {
+      evaluateSoloGameGuess(currentGuess);
     }
   }
 
@@ -937,6 +980,152 @@
     });
   }
 
+  // --- Mode 3: Play Solo (Guess at your own pace) ---
+  function startSoloGame() {
+    ensurePlayerName();
+    gameMode = 'solo';
+    currentRoomId = 'SOLO';
+    headerRoomCode.textContent = 'SOLO';
+    if (headerRoomLabel) headerRoomLabel.textContent = 'MODE';
+    playerNum = 1;
+    roundsMode = 'unlimited';
+    totalRounds = null;
+    currentRound = 1;
+    scores = { player1: soloTotalSolved, player2: soloBestStreak };
+    wordsHistory = [];
+    soloUsedWords = [];
+
+    if (botInterval) {
+      clearTimeout(botInterval);
+      botInterval = null;
+    }
+
+    pickSoloWord();
+    resetRoundState();
+    switchView('game');
+    updateAllNameElements();
+
+    const myHeading = document.querySelector('.main-board-wrapper .board-heading');
+    if (myHeading) myHeading.textContent = 'GUESS THE WORD';
+
+    playRoundCountdown(currentRound, () => {
+      gameStatus = 'playing';
+      startStopwatch();
+      inputGuidance.textContent = 'Five letters. Hit Enter when you\'re ready.';
+      showToast('Solo Mode: Guess the secret word!', 2000);
+    });
+  }
+
+  function pickSoloWord() {
+    const answers = (localWords.answers && localWords.answers.length > 0)
+      ? localWords.answers
+      : ['crane', 'slate', 'roast', 'react', 'audio', 'plant', 'brick', 'guide', 'flame', 'stone'];
+    const usedSet = new Set(soloUsedWords);
+    let available = answers.filter(w => !usedSet.has(w));
+    if (available.length === 0) {
+      soloUsedWords = [];
+      available = answers.slice();
+    }
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    soloUsedWords.push(chosen);
+    soloSecretWord = chosen;
+    return chosen;
+  }
+
+  function getWinCompliment(attempts) {
+    switch (attempts) {
+      case 1: return 'Genius! 🤯';
+      case 2: return 'Magnificent! ✨';
+      case 3: return 'Impressive! 🎯';
+      case 4: return 'Splendid! 👏';
+      case 5: return 'Great job! 👍';
+      case 6: return 'Phew! 😅';
+      default: return 'Solved! 🎉';
+    }
+  }
+
+  function evaluateSoloGameGuess(guess) {
+    const clean = (guess || '').trim().toLowerCase();
+    if (!isWordInDictionary(clean)) {
+      triggerHaptic('error');
+      shakeCurrentRow();
+      showToast('Not in word list');
+      isLocked = false;
+      inputGuidance.textContent = 'Five letters. Hit Enter when you\'re ready.';
+      return;
+    }
+
+    const evaluation = evaluateOffline(clean, soloSecretWord);
+    const row = currentRow;
+
+    animateRowFlip(row, clean, evaluation, () => {
+      currentRow++;
+      currentCol = 0;
+      currentGuess = '';
+      myGuessesCount.textContent = `${currentRow} / 6 guesses`;
+      currentGuessPhase.textContent = `Guess ${Math.min(6, currentRow + 1)} of 6`;
+
+      const won = evaluation.every(c => c === 'green');
+      if (won) {
+        gameStatus = 'round_ended';
+        stopStopwatch();
+        triggerHaptic('win');
+        soloStreak++;
+        soloTotalSolved++;
+        if (soloStreak > soloBestStreak) {
+          soloBestStreak = soloStreak;
+          try { localStorage.setItem('wordduel_solo_best_streak', soloBestStreak); } catch (e) {}
+        }
+        try {
+          localStorage.setItem('wordduel_solo_streak', soloStreak);
+          localStorage.setItem('wordduel_solo_solved', soloTotalSolved);
+        } catch (e) {}
+
+        scores.player1 = soloTotalSolved;
+        wordsHistory.push({ round: currentRound, word: soloSecretWord, winnerPlayerNum: 1, isDraw: false, guesses: currentRow });
+        updateRoundAndScoreDisplay();
+
+        setTimeout(() => {
+          showRoundOverModal({
+            currentRound,
+            totalRounds: null,
+            roundsMode: 'unlimited',
+            winnerPlayerNum: 1,
+            isDraw: false,
+            secretWord: soloSecretWord,
+            reason: getWinCompliment(currentRow),
+            scores: { player1: soloTotalSolved, player2: soloBestStreak },
+            isDuelOver: false
+          });
+        }, 600);
+      } else if (currentRow >= 6) {
+        gameStatus = 'round_ended';
+        stopStopwatch();
+        soloStreak = 0;
+        try { localStorage.setItem('wordduel_solo_streak', 0); } catch (e) {}
+        wordsHistory.push({ round: currentRound, word: soloSecretWord, winnerPlayerNum: null, isDraw: false, guesses: 6 });
+        updateRoundAndScoreDisplay();
+
+        setTimeout(() => {
+          showRoundOverModal({
+            currentRound,
+            totalRounds: null,
+            roundsMode: 'unlimited',
+            winnerPlayerNum: null,
+            isDraw: false,
+            secretWord: soloSecretWord,
+            reason: `Out of guesses! The secret word was ${soloSecretWord.toUpperCase()}.`,
+            scores: { player1: soloTotalSolved, player2: soloBestStreak },
+            isDuelOver: false
+          });
+        }, 600);
+      } else {
+        isLocked = false;
+        inputGuidance.textContent = 'Five letters. Hit Enter when you\'re ready.';
+      }
+    });
+  }
+
   // --- UI Event Handlers ---
   createGameBtn.addEventListener('click', () => {
     createDuelModal.style.display = 'flex';
@@ -1022,15 +1211,22 @@
     }
   });
 
+  if (playSoloBtn) {
+    playSoloBtn.addEventListener('click', () => {
+      startSoloGame();
+    });
+  }
+
   playBotBtn.addEventListener('click', () => {
     oppPlayerName = 'Bot AI 🤖';
     startBotGame();
   });
 
-  sameDeviceBtn.addEventListener('click', () => {
-    oppPlayerName = 'Player 2';
-    startBotGame();
-  });
+  if (sameDeviceBtn && sameDeviceBtn !== playSoloBtn) {
+    sameDeviceBtn.addEventListener('click', () => {
+      startSoloGame();
+    });
+  }
 
   if (playerNameInput) {
     playerNameInput.value = myPlayerName;
@@ -1065,10 +1261,14 @@
   });
 
   leaveRoomHeaderBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to leave this duel?')) {
+    const confirmMsg = (gameMode === 'solo')
+      ? 'Are you sure you want to exit this solo game?'
+      : 'Are you sure you want to leave this duel?';
+    if (confirm(confirmMsg)) {
       if (gameMode === 'online') {
         socket.emit('end_duel', { roomId: currentRoomId, playerId });
       }
+      document.body.classList.remove('solo-mode');
       window.location.href = '/';
     }
   });
@@ -1091,7 +1291,16 @@
 
   // Next round click
   nextRoundBtn.addEventListener('click', () => {
-    if (gameMode === 'bot') {
+    if (gameMode === 'solo') {
+      roundOverModal.style.display = 'none';
+      currentRound++;
+      pickSoloWord();
+      resetRoundState();
+      playRoundCountdown(currentRound, () => {
+        gameStatus = 'playing';
+        startStopwatch();
+      });
+    } else if (gameMode === 'bot') {
       roundOverModal.style.display = 'none';
       currentRound++;
       pickBotWord();
@@ -1110,7 +1319,19 @@
 
   // End duel click
   endDuelBtn.addEventListener('click', () => {
-    if (gameMode === 'bot') {
+    if (gameMode === 'solo') {
+      roundOverModal.style.display = 'none';
+      showFinalDuelResults({
+        duelWinnerPlayerNum: 1,
+        isDraw: false,
+        reason: 'Solo session finished!',
+        scores: { player1: soloTotalSolved, player2: soloBestStreak },
+        roundsPlayed: currentRound,
+        roundsMode: 'unlimited',
+        totalRounds: null,
+        wordsHistory: wordsHistory
+      });
+    } else if (gameMode === 'bot') {
       roundOverModal.style.display = 'none';
       showFinalDuelResults({
         duelWinnerPlayerNum: scores.player1 > scores.player2 ? 1 : (scores.player2 > scores.player1 ? 2 : null),
@@ -1129,7 +1350,11 @@
 
   // Rematch / Play again from duel end
   rematchBtn.addEventListener('click', () => {
-    if (gameMode === 'bot') {
+    if (gameMode === 'solo') {
+      duelResultsModal.style.display = 'none';
+      startSoloGame();
+    } else if (gameMode === 'bot') {
+      duelResultsModal.style.display = 'none';
       startBotGame();
     } else {
       rematchBtn.disabled = true;
@@ -1403,10 +1628,46 @@
     const secs = String(elapsedSeconds % 60).padStart(2, '0');
     statTime.textContent = `${mins}:${secs}`;
 
+    if (gameMode === 'solo') {
+      roundResultPill.textContent = `WORD ${rNum} RESULT`;
+      const won = winnerPlayerNum === 1;
+
+      if (won) {
+        triggerHaptic('win');
+        outcomeCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">emoji_events</span>';
+        outcomeTitle.textContent = getWinCompliment(currentRow);
+        outcomeSubtitle.textContent = `You found the secret word in ${currentRow} ${currentRow === 1 ? 'attempt' : 'attempts'}!`;
+      } else {
+        outcomeCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">sentiment_dissatisfied</span>';
+        outcomeTitle.textContent = 'Better Luck Next Time!';
+        outcomeSubtitle.textContent = `The secret word was ${secretWord ? secretWord.toUpperCase() : ''}.`;
+      }
+
+      if (roundMyNameLabel) roundMyNameLabel.textContent = 'Current Streak';
+      if (roundMyScore) roundMyScore.textContent = soloStreak;
+      if (roundOppNameLabel) roundOppNameLabel.textContent = 'Best Streak';
+      if (roundOppScore) roundOppScore.textContent = soloBestStreak;
+      if (oppRecapText) oppRecapText.style.display = 'none';
+
+      nextRoundBtn.style.display = 'block';
+      endDuelBtn.style.display = 'block';
+      nextRoundBtn.disabled = false;
+      nextRoundBtnText.textContent = 'Next Word';
+      endDuelBtn.textContent = 'Finish Session';
+      roundModalFootnote.textContent = 'Keep your streak alive with another word!';
+      roundOverModal.style.display = 'flex';
+      refreshGoogleAds();
+      return;
+    }
+
+    if (oppRecapText) oppRecapText.style.display = '';
+    endDuelBtn.textContent = 'End Duel';
     const myPts = playerNum === 1 ? (rScores.player1 || 0) : (rScores.player2 || 0);
     const oppPts = playerNum === 1 ? (rScores.player2 || 0) : (rScores.player1 || 0);
     roundMyScore.textContent = myPts;
     roundOppScore.textContent = oppPts;
+    if (roundMyNameLabel) roundMyNameLabel.textContent = myPlayerName || 'You';
+    if (roundOppNameLabel) roundOppNameLabel.textContent = oppPlayerName || 'Opponent';
 
     roundResultPill.textContent = `ROUND ${rNum} RESULT`;
     const isWinner = winnerPlayerNum === playerNum;
@@ -1466,6 +1727,40 @@
 
   function showFinalDuelResults(data) {
     const { duelWinnerPlayerNum, isDraw, reason, scores: fScores, wordsHistory: fHistory } = data;
+
+    if (gameMode === 'solo') {
+      duelFinalCrown.innerHTML = '<span class="material-symbols-rounded crown-icon">emoji_events</span>';
+      duelFinalTitle.textContent = 'Solo Session Complete!';
+      duelFinalSubtitle.textContent = `You solved ${soloTotalSolved} word${soloTotalSolved === 1 ? '' : 's'} with a best streak of ${soloBestStreak}!`;
+      duelFinalMyLabel.textContent = 'Words Solved';
+      duelFinalMyScore.textContent = soloTotalSolved;
+      duelFinalOppLabel.textContent = 'Best Streak';
+      duelFinalOppScore.textContent = soloBestStreak;
+
+      // Populate words history
+      duelWordsHistoryList.innerHTML = '';
+      const historyToRender = fHistory || wordsHistory;
+      if (historyToRender && historyToRender.length > 0) {
+        historyToRender.forEach(h => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          const won = h.winnerPlayerNum === 1;
+          const statusText = won ? `Solved (${h.guesses || '?'} / 6)` : 'Missed';
+          item.innerHTML = `
+            <span class="history-item-round">W${h.round}</span>
+            <span class="history-item-word">${h.word.toUpperCase()}</span>
+            <span class="history-item-winner" style="${won ? 'color: #22c55e;' : 'color: #ef4444;'}">${statusText}</span>
+          `;
+          duelWordsHistoryList.appendChild(item);
+        });
+      }
+
+      rematchBtn.disabled = false;
+      rematchBtnText.textContent = 'Play Again';
+      duelResultsModal.style.display = 'flex';
+      refreshGoogleAds();
+      return;
+    }
 
     const myPts = playerNum === 1 ? (fScores.player1 || 0) : (fScores.player2 || 0);
     const oppPts = playerNum === 1 ? (fScores.player2 || 0) : (fScores.player1 || 0);

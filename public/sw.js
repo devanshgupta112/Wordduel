@@ -1,9 +1,9 @@
 // public/sw.js - Service Worker for WORDDUEL PWA and Android Offline Support
-const CACHE_NAME = 'wordduel-v7';
+const CACHE_NAME = 'wordduel-v8';
 const STATIC_ASSETS = [
   '/',
-  '/style.css?v=7',
-  '/game.js?v=7',
+  '/style.css?v=8',
+  '/game.js?v=8',
   '/words.json',
   '/icon.svg',
   '/manifest.json'
